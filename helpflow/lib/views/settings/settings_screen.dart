@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/design_system.dart';
 
 /// 설정 화면 (뼈대)
 /// 다크 모드 토글, 언어, 알림 설정 등 구현 예정
@@ -8,6 +9,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
+      backgroundColor: HelpFlowColors.background,
       body: Center(
         child: Text('설정 화면'),
       ),

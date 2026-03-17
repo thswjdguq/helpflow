@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/design_system.dart';
 
 /// 티켓 목록 화면 (뼈대)
 /// 추후 Hive DB 연동 및 필터/검색 기능 추가 예정
@@ -8,6 +9,7 @@ class TicketListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
+      backgroundColor: HelpFlowColors.background,
       body: Center(
         child: Text('티켓 목록 화면'),
       ),

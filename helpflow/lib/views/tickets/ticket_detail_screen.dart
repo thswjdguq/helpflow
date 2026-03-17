@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/design_system.dart';
 
 /// 티켓 상세 화면 (뼈대)
 /// ticketId를 받아 해당 티켓의 상세 정보를 표시
@@ -12,6 +13,7 @@ class TicketDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: HelpFlowColors.background,
       body: Center(
         child: Text('티켓 상세 화면 (ID: $ticketId)'),
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/design_system.dart';
 
 /// 티켓 생성/수정 폼 화면 (뼈대)
 /// 새 티켓 생성(/tickets/new)과 기존 티켓 수정 모두 이 화면을 사용
@@ -9,6 +10,7 @@ class TicketFormScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
+      backgroundColor: HelpFlowColors.background,
       body: Center(
         child: Text('티켓 생성/수정 화면'),
       ),
