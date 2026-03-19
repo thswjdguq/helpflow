@@ -1,3 +1,102 @@
+# 2주차 Day 3 — Daily Report
+
+**날짜**: 2026-03-19
+**브랜치**: main
+**작업자**: Claude Sonnet 4.6
+
+---
+
+## 완료한 작업
+
+### 1. 비로그인 대시보드 접근 차단 (`lib/core/router/app_router.dart`)
+
+**원인 분석:**
+- `initialLocation: '/dashboard'`로 설정되어 있어 앱 시작 시 대시보드가 먼저 렌더링됨
+- redirect 콜백이 `FirebaseAuth.instance.currentUser`를 동기적으로 읽었으나, Firebase 미초기화 시 예외 처리 흐름이 불안정
+- `_GoRouterRefreshStream`이 Firebase 스트림을 직접 구독해 Riverpod `authStateProvider`와 타이밍 불일치 가능성 존재
+
+**해결:**
+- `initialLocation: AppRoutes.login` 변경 → 앱 시작 시 무조건 로그인 화면 먼저
+- `_GoRouterRefreshStream` → `_GoRouterNotifier` + `ref.listen(authStateProvider)` 패턴으로 교체
+  - Riverpod이 auth 상태를 업데이트한 직후 `notifyListeners()` 호출 → 타이밍 문제 완전 해소
+- redirect 콜백에서 `ref.read(authStateProvider)`로 인증 상태 확인
+  - `data(user == null)` → `/login` 강제 이동
+  - `data(user != null && isOnAuthPage)` → `/dashboard` 자동 이동
+  - `loading` / `error` → 보호 경로 차단, `/login`에서 대기
+
+### 2. 다크모드 색상 통일 (`design_system.dart`, `app_theme.dart`, `main_layout.dart`)
+
+**원인 분석:**
+- 다크 테마가 `ColorScheme.fromSeed(Brightness.dark)` 자동 생성 색상에만 의존
+- 사이드바는 `surfaceContainerLow`(자동), 콘텐츠는 `HelpFlowColors.background`(#FFFFFF 하드코딩) → 영역별 색상 불일치
+
+**해결:**
+
+`design_system.dart`에 다크 모드 색상 상수 추가:
+| 상수 | 색상 | 용도 |
+|------|------|------|
+| `darkBackground` | #121212 | 앱 배경 |
+| `darkSurface` | #1E1E1E | 사이드바/상단바 |
+| `darkCard` | #2C2C2C | 카드/컨테이너 |
+| `darkBorder` | #3D3D3D | 테두리/구분선 |
+| `darkText` | #F0F0F0 | 기본 텍스트 |
+| `darkSubtext` | #A0A0A0 | 보조 텍스트 |
+
+라이트 모드 색상 상수 추가:
+| 상수 | 색상 | 용도 |
+|------|------|------|
+| `border` | #E8EAED | 카드 테두리 |
+| `textPrimary` | #191F28 | 기본 텍스트 |
+
+`app_theme.dart` 다크 테마 재작성:
+- `ColorScheme.fromSeed().copyWith()`로 `surface`, `surfaceContainerLow`, `outline` 명시적 교체
+- `scaffoldBackgroundColor: #121212`
+- NavigationRail, BottomNavBar, Drawer 배경색 → `#1E1E1E` 명시
+
+`main_layout.dart`:
+- `backgroundColor: HelpFlowColors.background` (3곳) → `Theme.of(context).scaffoldBackgroundColor`로 교체
+- `import '../../core/design_system.dart'` 제거 (불필요)
+
+---
+
+## 발생한 오류 & 해결
+
+| 오류 | 원인 | 해결 |
+|------|------|------|
+| `Unnecessary use of multiple underscores` | `(_, __)` 패턴 linter 경고 | `(_, _)`으로 수정 |
+| `Undefined name 'HelpFlowColors'` | import 제거 후 잔존 참조 | `replace_all`로 3곳 일괄 교체 |
+
+---
+
+## 미완료 항목
+
+- [ ] `flutterfire configure` 실행 후 `firebase_options.dart` 실제 값으로 교체
+- [ ] Firebase Auth 콘솔 이메일/비밀번호 활성화
+- [ ] Firestore 보안 규칙 설정
+- [ ] 실 기기/Chrome에서 로그인 화면 → 대시보드 흐름 검증
+
+---
+
+## 커밋 내역
+
+```
+7182310  fix: 비로그인 대시보드 접근 차단 및 로그인 필수 라우팅 구현
+39503c9  fix: 다크모드 색상 불일치 수정 및 전체 UI 색상 통일
+```
+
+---
+
+## 생성·수정 파일 목록
+
+| 파일 | 상태 |
+|------|------|
+| `lib/core/design_system.dart` | 수정 (다크 모드 색상 6개 + 라이트 2개 추가) |
+| `lib/core/theme/app_theme.dart` | 수정 (다크 테마 전면 재작성, 라이트 테마 정밀화) |
+| `lib/core/router/app_router.dart` | 수정 (initialLocation=/login, _GoRouterNotifier 패턴, ref 기반 redirect) |
+| `lib/views/layout/main_layout.dart` | 수정 (배경색 하드코딩 3곳 → scaffoldBackgroundColor) |
+
+---
+
 # 2주차 Day 2 — Daily Report
 
 **날짜**: 2026-03-19
