@@ -45,6 +45,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   /// 회원가입 버튼 클릭 처리
   /// 유효성 검사 → Riverpod signUp 호출 → 성공 시 라우터가 자동 리다이렉트
+  /// 실패 시 에러 메시지를 인라인 + SnackBar 두 곳에 동시 표시
   Future<void> _handleSignup() async {
     // 폼 유효성 검사 실패 시 중단
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -55,18 +56,38 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     });
 
     try {
+      // signUp()은 실패 시 rethrow하므로 여기서 catch 가능
       await ref.read(currentUserProvider.notifier).signUp(
             _emailController.text.trim(),
             _passwordController.text,
             _nameController.text.trim(),
           );
+      // 성공 시 go_router redirect가 /dashboard로 자동 이동 → 별도 처리 불필요
     } catch (e) {
-      // Exception: 접두사 제거 후 화면에 표시
-      setState(() {
-        _errorMessage = e.toString().replaceFirst('Exception: ', '');
-      });
+      // 'Exception: ' 접두사 제거 후 한글 메시지 추출
+      final message = e.toString().replaceFirst('Exception: ', '');
+
+      // 인라인 에러 메시지 업데이트 (폼 아래 빨간 박스)
+      if (mounted) {
+        setState(() => _errorMessage = message);
+      }
+
+      // SnackBar로도 표시 (스크롤 위치와 무관하게 항상 보임)
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: HelpFlowColors.error,
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(HelpFlowSpacing.lg),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+      }
     } finally {
-      // 위젯이 아직 살아있을 때만 상태 변경
+      // 위젯이 살아있을 때만 로딩 종료 처리
       if (mounted) {
         setState(() => _isLoading = false);
       }

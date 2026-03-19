@@ -51,17 +51,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     try {
+      // signIn()은 실패 시 rethrow하므로 여기서 catch 가능
       await ref.read(currentUserProvider.notifier).signIn(
             _emailController.text.trim(),
             _passwordController.text,
           );
+      // 성공 시 go_router redirect가 /dashboard로 자동 이동
     } catch (e) {
-      // Exception: 접두사 제거 후 화면에 표시
-      setState(() {
-        _errorMessage = e.toString().replaceFirst('Exception: ', '');
-      });
+      // 'Exception: ' 접두사 제거 후 한글 메시지 추출
+      final message = e.toString().replaceFirst('Exception: ', '');
+
+      // 인라인 에러 메시지 업데이트
+      if (mounted) {
+        setState(() => _errorMessage = message);
+      }
+
+      // SnackBar로도 표시
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: HelpFlowColors.error,
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(HelpFlowSpacing.lg),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+      }
     } finally {
-      // 위젯이 아직 살아있을 때만 상태 변경
+      // 위젯이 살아있을 때만 로딩 종료 처리
       if (mounted) {
         setState(() => _isLoading = false);
       }

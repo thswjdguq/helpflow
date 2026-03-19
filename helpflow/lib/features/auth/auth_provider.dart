@@ -3,99 +3,119 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_service.dart';
 import 'user_model.dart';
 
-// ────────────────────────────────────────────────────────────────────────────
-// AuthService 프로바이더
-// ────────────────────────────────────────────────────────────────────────────
+// ── AuthService 프로바이더 ────────────────────────────────────────────────────
 
 /// AuthService 싱글턴 프로바이더
-/// 로그인/회원가입 메서드 호출 시 사용
+/// 로그인/회원가입/로그아웃 메서드 호출 시 ref.read(authServiceProvider)로 접근
 final authServiceProvider = Provider<AuthService>((ref) {
   return AuthService();
 });
 
-// ────────────────────────────────────────────────────────────────────────────
-// Firebase Auth 상태 스트림 프로바이더
-// ────────────────────────────────────────────────────────────────────────────
+// ── Firebase Auth 상태 스트림 프로바이더 ────────────────────────────────────
 
-/// Firebase 인증 상태 스트림 프로바이더
-/// User? 스트림을 구독: 로그인 시 User, 로그아웃 시 null
+/// Firebase 인증 상태 스트림 프로바이더 (User?)
+/// 로그인 시 User 방출, 로그아웃 시 null 방출
+/// go_router의 redirect가 이 스트림을 구독해 화면 분기 처리
 final authStateProvider = StreamProvider<User?>((ref) {
   final authService = ref.read(authServiceProvider);
   return authService.authStateChanges;
 });
 
-// ────────────────────────────────────────────────────────────────────────────
-// 현재 사용자 정보 상태 관리 (AsyncNotifierProvider)
-// ────────────────────────────────────────────────────────────────────────────
+// ── 현재 사용자 정보 Notifier ────────────────────────────────────────────────
 
 /// 현재 로그인된 사용자의 UserModel 상태 관리
 /// AsyncNotifierProvider 패턴 사용
 class CurrentUserNotifier extends AsyncNotifier<UserModel?> {
-  /// 초기 상태: Firebase Auth 현재 사용자 확인
+  /// 초기 상태 빌드: Firebase Auth 현재 사용자를 UserModel로 변환
+  /// authStateProvider 변화 시 자동으로 재실행됨
   @override
   Future<UserModel?> build() async {
-    // authStateProvider 변화를 구독해서 자동 갱신
+    // authStateProvider를 watch해서 로그인 상태 변화에 반응
     final authState = ref.watch(authStateProvider);
 
     return authState.when(
       data: (user) async {
         if (user == null) return null;
-
-        // Firestore에서 사용자 정보 조회 시도
-        try {
-          // Firestore 조회는 signIn 시 처리됨
-          // 여기서는 Firebase Auth 기본 정보만 UserModel로 래핑
-          return UserModel(
-            uid: user.uid,
-            email: user.email ?? '',
-            name: user.displayName ?? '',
-            role: UserRole.user,
-            createdAt: user.metadata.creationTime ?? DateTime.now(),
-          );
-        } catch (_) {
-          return null;
-        }
+        // Firebase Auth 기본 정보를 UserModel로 래핑
+        // (Firestore 상세 정보는 signIn 시점에 별도 조회)
+        return UserModel(
+          uid: user.uid,
+          email: user.email ?? '',
+          name: user.displayName ?? '',
+          role: UserRole.user,
+          createdAt: user.metadata.creationTime ?? DateTime.now(),
+        );
       },
       loading: () => null,
       error: (_, _) => null,
     );
   }
 
-  /// 로그인 처리
+  // ── 로그인 ────────────────────────────────────────────────────────────────
+
+  /// 이메일/비밀번호로 로그인
   ///
-  /// [email] 이메일, [password] 비밀번호
-  /// 성공 시 state를 UserModel로 갱신, 실패 시 AsyncError 설정
+  /// 성공 시: state = AsyncData(UserModel)
+  /// 실패 시: state = AsyncError + 호출자에게 예외 rethrow
+  ///          → signup_screen/login_screen의 catch 블록에서 에러 메시지 표시 가능
   Future<void> signIn(String email, String password) async {
+    // 로딩 상태로 전환 (버튼 비활성화)
     state = const AsyncLoading();
     final authService = ref.read(authServiceProvider);
 
-    state = await AsyncValue.guard(() async {
-      return await authService.signInWithEmail(email, password);
-    });
+    try {
+      // AuthService를 통해 Firebase 로그인 처리
+      final user = await authService.signInWithEmail(email, password);
+      // 성공: 사용자 정보를 state에 저장
+      state = AsyncData(user);
+    } catch (e, st) {
+      // 실패: 에러 상태로 전환 후 호출자에게 예외 전파
+      // AsyncValue.guard()와 달리 rethrow를 사용해
+      // login_screen.dart의 catch 블록이 실행되게 함
+      state = AsyncError(e, st);
+      rethrow;
+    }
   }
 
-  /// 회원가입 처리
+  // ── 회원가입 ──────────────────────────────────────────────────────────────
+
+  /// 이메일/비밀번호/이름으로 회원가입
   ///
-  /// [email] 이메일, [password] 비밀번호, [name] 이름
+  /// 성공 시: state = AsyncData(UserModel) → authStateChanges가 자동으로 /dashboard 이동
+  /// 실패 시: state = AsyncError + 호출자에게 예외 rethrow
+  ///          → signup_screen.dart의 catch 블록에서 에러 메시지 표시 가능
   Future<void> signUp(String email, String password, String name) async {
+    // 로딩 상태로 전환 (버튼 비활성화)
     state = const AsyncLoading();
     final authService = ref.read(authServiceProvider);
 
-    state = await AsyncValue.guard(() async {
-      return await authService.signUpWithEmail(email, password, name);
-    });
+    try {
+      // AuthService를 통해 Firebase 계정 생성 + Firestore 저장
+      final user = await authService.signUpWithEmail(email, password, name);
+      // 성공: 신규 사용자 정보를 state에 저장
+      state = AsyncData(user);
+    } catch (e, st) {
+      // 실패: 에러 상태로 전환 후 호출자에게 예외 전파
+      state = AsyncError(e, st);
+      rethrow;
+    }
   }
 
-  /// 로그아웃 처리
+  // ── 로그아웃 ──────────────────────────────────────────────────────────────
+
+  /// 현재 사용자 로그아웃
+  /// 성공 시: state = AsyncData(null) → authStateChanges가 자동으로 /login 이동
   Future<void> signOut() async {
     state = const AsyncLoading();
     final authService = ref.read(authServiceProvider);
 
     try {
       await authService.signOut();
+      // 로그아웃 성공: null로 초기화
       state = const AsyncData(null);
     } catch (e, st) {
       state = AsyncError(e, st);
+      rethrow;
     }
   }
 }
@@ -106,10 +126,14 @@ final currentUserProvider =
   CurrentUserNotifier.new,
 );
 
-// ── [파일 요약] ───────────────────────────────────────────────────────────────
+// ============================================================
+// [파일 요약]
 // 파일명: auth_provider.dart
-// 역할: Riverpod 인증 상태 관리.
-//       authServiceProvider - AuthService 싱글턴 제공.
-//       authStateProvider - Firebase Auth 스트림 구독 (User? StreamProvider).
-//       currentUserProvider - 현재 사용자 UserModel AsyncNotifierProvider.
-//       CurrentUserNotifier - signIn/signUp/signOut 메서드로 상태 갱신.
+// 역할: Firebase Auth 기반 인증 상태 Riverpod 관리
+// 주요 클래스/함수:
+//   - authServiceProvider: AuthService 싱글턴 제공
+//   - authStateProvider: Firebase Auth 스트림 구독 (User? StreamProvider)
+//   - CurrentUserNotifier: signIn/signUp/signOut 처리
+//     · 에러 발생 시 state=AsyncError 설정 후 rethrow로 화면 catch 블록 실행 가능
+// 연관 파일: auth_service.dart, login_screen.dart, signup_screen.dart, app_router.dart
+// ============================================================
