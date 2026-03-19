@@ -1,3 +1,60 @@
+# 2주차 Day 4 — Daily Report
+
+**날짜**: 2026-03-19
+**브랜치**: main
+**작업자**: Claude Sonnet 4.6
+
+---
+
+## ✅ 완료한 작업
+
+### auth_provider.dart — signIn/signUp 에러 전파 수정
+- **문제**: `AsyncValue.guard()`는 예외를 `state=AsyncError`로만 처리하고 호출자에게 throw하지 않아 화면의 `catch` 블록이 실행되지 않았음
+- **수정**: try-catch + `rethrow` 패턴으로 교체 → 화면 레이어에서 에러 메시지 표시 가능해짐
+
+### signup_screen.dart / login_screen.dart — 에러 표시 보강
+- 인라인 에러 박스(폼 아래 빨간 컨테이너) 유지
+- `ScaffoldMessenger.showSnackBar()` 추가 → 스크롤 위치와 무관하게 항상 에러 보임
+- SnackBar: floating 스타일, error 색상, radius 8 적용
+- `mounted` 체크로 위젯 소멸 후 setState 방지
+
+---
+
+## 🐛 발생한 오류 & 해결 방법
+
+| 오류 | 원인 | 해결 |
+|------|------|------|
+| 회원가입 버튼 눌러도 반응 없음 | `AsyncValue.guard()`가 에러를 rethrow하지 않아 화면 catch 블록 미실행 | try-catch + rethrow 패턴으로 교체 |
+| 에러 메시지 미표시 | 위와 동일 원인으로 `setState(() => _errorMessage = ...)` 실행 안 됨 | rethrow 수정 후 해결, SnackBar 추가 |
+
+---
+
+## ⚠️ 미완료 / 다음에 할 것
+
+- [ ] Firebase Console → Authentication → Sign-in method → 이메일/비밀번호 **활성화** 필수
+- [ ] Firestore Database 생성 및 보안 규칙 설정
+- [ ] 실 기기에서 회원가입 → 로그인 → 대시보드 전체 플로우 테스트
+
+---
+
+## 📦 커밋 내역
+
+```
+c699a00  fix: 회원가입 오류 처리 및 에러 메시지 표시 수정
+```
+
+---
+
+## 🔗 생성/수정된 파일 목록
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `lib/features/auth/auth_provider.dart` | signIn/signUp/signOut: AsyncValue.guard → try-catch+rethrow |
+| `lib/features/auth/signup_screen.dart` | _handleSignup: SnackBar 에러 표시 추가 |
+| `lib/features/auth/login_screen.dart` | _handleLogin: SnackBar 에러 표시 추가 |
+
+---
+
 # 2주차 Day 3 — Daily Report
 
 **날짜**: 2026-03-19
