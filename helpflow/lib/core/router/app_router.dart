@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,76 +31,74 @@ class AppRoutes {
   static const String settings = '/settings';
 }
 
-// ── GoRouter 새로고침 리스너 ────────────────────────────────────────────────
+// ── GoRouter 새로고침 알리미 ────────────────────────────────────────────────
 
-/// Firebase Auth 스트림 변화를 GoRouter에 전달하는 ChangeNotifier
-/// authStateChanges 스트림 이벤트 발생 시 notifyListeners() 호출 →
-/// GoRouter가 redirect 콜백을 재실행해 인증 상태에 맞는 화면으로 이동
-class _GoRouterRefreshStream extends ChangeNotifier {
-  /// [stream] Firebase Auth authStateChanges 스트림
-  _GoRouterRefreshStream(Stream<dynamic> stream) {
-    // 초기화 즉시 한 번 알림 (앱 시작 시 redirect 실행)
-    notifyListeners();
-    // 스트림 이벤트마다 GoRouter redirect 재실행 트리거
-    _subscription = stream.listen((_) => notifyListeners());
-  }
-
-  late final StreamSubscription<dynamic> _subscription;
-
-  @override
-  void dispose() {
-    _subscription.cancel();
-    super.dispose();
-  }
+/// GoRouter redirect 재실행을 트리거하는 ChangeNotifier
+/// Riverpod ref.listen()을 통해 authStateProvider 변화를 감지하고
+/// notifyListeners()를 호출해 GoRouter가 redirect를 다시 평가하게 한다.
+class _GoRouterNotifier extends ChangeNotifier {
+  /// 외부에서 GoRouter refresh를 트리거할 때 호출
+  void notify() => notifyListeners();
 }
 
 // ── GoRouter Provider ───────────────────────────────────────────────────────
 
 /// GoRouter Riverpod 프로바이더
-/// authStateProvider를 refreshListenable로 연결해 로그인 상태 변화 시
-/// redirect 콜백이 자동으로 재실행되도록 설정
+///
+/// 핵심 동작:
+///  1. _GoRouterNotifier를 refreshListenable로 사용
+///  2. ref.listen(authStateProvider)로 인증 상태 변화 감지 → notify() 호출
+///  3. redirect 콜백에서 ref.read(authStateProvider)로 현재 인증 상태 확인
+///  4. initialLocation = /login → 앱 시작 시 항상 로그인 화면부터 시작
+///     (로그인 상태이면 redirect가 즉시 /dashboard로 보냄)
 final appRouterProvider = Provider<GoRouter>((ref) {
-  // Firebase Auth 스트림을 GoRouter 새로고침 리스너로 래핑
-  // Firebase 미초기화 상태(플레이스홀더)에서는 빈 스트림으로 폴백
-  ChangeNotifier refreshListenable;
-  try {
-    final authService = ref.read(authServiceProvider);
-    refreshListenable = _GoRouterRefreshStream(authService.authStateChanges);
-  } catch (_) {
-    // Firebase 미초기화 시 단순 ChangeNotifier 사용 (갱신 없음)
-    refreshListenable = ChangeNotifier();
-  }
+  // GoRouter refresh 알리미 생성
+  final notifier = _GoRouterNotifier();
+
+  // authStateProvider(Firebase Auth 스트림) 변화를 감지해 GoRouter redirect 재실행
+  // ref.listen은 authStateProvider가 새 값을 방출할 때마다 콜백 실행
+  ref.listen<AsyncValue<User?>>(authStateProvider, (_, _) {
+    notifier.notify();
+  });
 
   return GoRouter(
-    initialLocation: AppRoutes.dashboard,
-    refreshListenable: refreshListenable,
+    // ── 앱 시작 위치: 항상 /login ─────────────────────────────────────────
+    // redirect 콜백이 로그인 상태를 확인해 /dashboard로 자동 이동
+    // 이 설정으로 비로그인 상태에서 /dashboard 직접 접근을 완전히 차단
+    initialLocation: AppRoutes.login,
+    refreshListenable: notifier,
 
-    // ── 인증 상태 기반 리다이렉트 ────────────────────────────────────────
+    // ── 인증 상태 기반 리다이렉트 ─────────────────────────────────────────
+    // 매 라우팅 시도마다 실행 (새 페이지 이동, 앱 시작, 인증 상태 변화 시)
     redirect: (BuildContext context, GoRouterState state) {
       // 현재 접근 중인 경로
       final location = state.matchedLocation;
 
-      // 인증 화면 여부 (/login, /signup)
+      // 인증 화면(/login, /signup) 여부
       final isOnAuthPage =
           location == AppRoutes.login || location == AppRoutes.signup;
 
-      // Firebase 로그인 여부 확인
-      // Firebase 미초기화 예외 발생 시 미로그인으로 처리
-      bool isLoggedIn = false;
-      try {
-        isLoggedIn = FirebaseAuth.instance.currentUser != null;
-      } catch (_) {
-        isLoggedIn = false;
-      }
+      // Riverpod에서 현재 인증 상태를 동기적으로 읽기
+      // authStateProvider는 Firebase Auth authStateChanges 스트림
+      final authState = ref.read(authStateProvider);
 
-      // 미로그인 + 보호 경로 → 로그인 화면으로
-      if (!isLoggedIn && !isOnAuthPage) return AppRoutes.login;
-
-      // 로그인 완료 + 인증 화면 접근 → 대시보드로
-      if (isLoggedIn && isOnAuthPage) return AppRoutes.dashboard;
-
-      // 그 외: 리다이렉트 없음
-      return null;
+      return authState.when(
+        // ── 인증 상태 확인 완료 ──────────────────────────────────────────
+        data: (user) {
+          // 미로그인 + 인증 화면 아님 → 로그인 화면으로 강제 이동
+          if (user == null && !isOnAuthPage) return AppRoutes.login;
+          // 로그인 완료 + 인증 화면 접근 → 대시보드로 이동
+          if (user != null && isOnAuthPage) return AppRoutes.dashboard;
+          // 그 외: 현재 경로 유지
+          return null;
+        },
+        // ── 인증 상태 로딩 중 ────────────────────────────────────────────
+        // Firebase Auth 초기화 중: 인증 화면이 아니면 /login에서 대기
+        loading: () => isOnAuthPage ? null : AppRoutes.login,
+        // ── 인증 에러 (Firebase 미초기화 등) ────────────────────────────
+        // 에러 시에도 보호 경로 접근 차단
+        error: (_, _) => isOnAuthPage ? null : AppRoutes.login,
+      );
     },
 
     routes: [
@@ -163,8 +160,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
     ],
 
-    // 존재하지 않는 경로 접근 시 대시보드로 (redirect가 /login으로 보냄)
-    errorBuilder: (context, state) => const DashboardScreen(),
+    // 존재하지 않는 경로 → redirect가 인증 상태에 따라 처리
+    errorBuilder: (context, state) => const LoginScreen(),
   );
 });
 
@@ -173,9 +170,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 // 역할: go_router 기반 앱 라우터 Provider 정의.
 //       AppRoutes: /login, /signup, /dashboard, /tickets, /tickets/new,
 //                  /tickets/:id, /settings 경로 상수 관리.
-//       _GoRouterRefreshStream: Firebase Auth 스트림 → ChangeNotifier 변환.
-//       appRouterProvider: GoRouter Provider.
-//         - refreshListenable로 인증 상태 변화 감지.
-//         - redirect 콜백으로 미로그인 시 /login, 로그인 후 /dashboard 리다이렉트.
+//       _GoRouterNotifier: ref.listen(authStateProvider) 변화를 ChangeNotifier로 전달.
+//       appRouterProvider:
+//         - initialLocation: /login → 앱 시작 시 항상 로그인 화면 먼저.
+//         - redirect: Riverpod authStateProvider 기반으로 인증 상태 확인.
+//           · 미로그인 + 보호 경로 → /login 강제.
+//           · 로그인 + 인증 화면 → /dashboard 자동 이동.
+//           · 로딩/에러 → /login에서 대기 (보호 경로 차단).
 //         - /login, /signup은 ShellRoute 밖 (사이드바 없음).
 // 사용: app.dart에서 ref.watch(appRouterProvider)로 MaterialApp.router에 전달.
