@@ -1,3 +1,6 @@
+# Firebase 설정 파일 (실제 API 키 포함 — 절대 커밋 금지)
+lib/firebase_options.dart
+
 # Miscellaneous
 *.class
 *.log
