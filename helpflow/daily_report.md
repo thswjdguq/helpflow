@@ -1,3 +1,90 @@
+# 2주차 Day 2 — Daily Report
+
+**날짜**: 2026-03-19
+**브랜치**: main (week-02 머지)
+**작업자**: Claude Sonnet 4.6
+
+---
+
+## 완료한 작업
+
+### 1. Firebase 패키지 추가 및 초기화
+- `pubspec.yaml`에 `firebase_core ^3.0.0`, `firebase_auth ^5.0.0`, `cloud_firestore ^5.0.0`, `firebase_storage ^12.0.0` 추가
+- `main.dart`에 `Firebase.initializeApp()` 추가 (플레이스홀더 예외 catch 처리)
+- `lib/firebase_options.dart` 플레이스홀더 생성 (실제 연결 시 `flutterfire configure` 실행 필요)
+
+### 2. Firebase 인증 구조 구현 (`lib/features/auth/`)
+| 파일 | 역할 |
+|------|------|
+| `user_model.dart` | uid/email/name/role/createdAt 모델, fromFirestore/toMap |
+| `auth_service.dart` | signInWithEmail / signUpWithEmail / signOut |
+| `auth_provider.dart` | authStateProvider(StreamProvider), currentUserProvider(AsyncNotifierProvider) |
+| `login_screen.dart` | 토스 스타일 로그인 UI, 유효성 검사, 에러 처리 |
+| `signup_screen.dart` | 이름/이메일/비밀번호 회원가입 UI |
+
+### 3. Firebase 공통 서비스 (`lib/shared/services/firebase_service.dart`)
+- `handleFirebaseError()`: FirebaseAuthException 코드 → 한글 메시지 변환
+
+### 4. 라우터 인증 분기 수정 (`lib/core/router/app_router.dart`)
+- `appRouter` 전역 변수 → `appRouterProvider` (Riverpod Provider)로 전환
+- `_GoRouterRefreshStream`: Firebase Auth 스트림 → ChangeNotifier 래핑
+- `redirect` 콜백 추가: 미로그인 → `/login`, 로그인 후 인증 화면 접근 → `/dashboard`
+- `/login`, `/signup` 경로 추가 (ShellRoute 밖, 사이드바 없음)
+
+### 5. app.dart 업데이트
+- `appRouter` (전역) → `ref.watch(appRouterProvider)` 로 교체
+- Firebase Auth 상태 변화 시 GoRouter redirect 자동 재실행
+
+---
+
+## 발생한 오류 & 해결
+
+| 오류 | 원인 | 해결 |
+|------|------|------|
+| `AppRoutes.signup isn't defined` | `login_screen.dart` 작성 시점에 AppRoutes에 signup 미정의 | `app_router.dart` 먼저 업데이트 후 해결 |
+| `signup_screen.dart doesn't exist` | 파일 생성 전에 import | `signup_screen.dart` 생성으로 해결 |
+| `authService` unused variable | `auth_provider.dart` build() 내 불필요한 변수 선언 | 해당 줄 제거 |
+| `error: (_, __)` linter 경고 | 다중 언더스코어 불필요 경고 | `(_, _)` 로 수정 |
+
+---
+
+## 미완료 항목
+
+- [ ] `flutterfire configure` 실행 후 `firebase_options.dart` 실제 값으로 교체
+- [ ] Firebase Authentication 콘솔에서 이메일/비밀번호 로그인 활성화
+- [ ] Firestore 보안 규칙 설정
+- [ ] 라우터 인증 가드 테스트 (실제 Firebase 연결 후)
+
+---
+
+## 커밋 내역
+
+```
+24cd4b3  feat: 로그인/회원가입 화면 UI 구현 (토스 스타일)
+8fcde63  feat: go_router redirect 콜백 및 인증 경로(/login, /signup) 추가
+ad5d593  fix: 로그인 화면 라우팅 연결 및 인증 상태 분기 수정
+```
+
+---
+
+## 생성·수정 파일 목록
+
+| 파일 | 상태 |
+|------|------|
+| `lib/features/auth/login_screen.dart` | 신규 생성 |
+| `lib/features/auth/signup_screen.dart` | 신규 생성 |
+| `lib/features/auth/auth_provider.dart` | 신규 생성 |
+| `lib/features/auth/auth_service.dart` | 신규 생성 |
+| `lib/features/auth/user_model.dart` | 신규 생성 |
+| `lib/shared/services/firebase_service.dart` | 신규 생성 |
+| `lib/firebase_options.dart` | 신규 생성 (플레이스홀더) |
+| `lib/core/router/app_router.dart` | 수정 (Provider 전환 + redirect 추가) |
+| `lib/main.dart` | 수정 (Firebase.initializeApp 추가) |
+| `lib/app.dart` | 수정 (appRouterProvider 연동) |
+| `pubspec.yaml` | 수정 (Firebase 패키지 추가) |
+
+---
+
 # 1주차 Day 1 — Daily Report
 
 **날짜**: 2026-03-15
