@@ -35,6 +35,32 @@ class HelpFlowColors {
   // ── 에러 컬러 ─────────────────────────────────────
   /// 오류/경고 상태 색상 (토스 스타일 레드)
   static const Color error = Color(0xFFFF4D4F);
+
+  // ── 라이트 모드 추가 색상 ─────────────────────────
+  /// 카드 테두리 색상 (라이트 모드)
+  static const Color border = Color(0xFFE8EAED);
+
+  /// 기본 텍스트 색상 (라이트 모드)
+  static const Color textPrimary = Color(0xFF191F28);
+
+  // ── 다크 모드 색상 ────────────────────────────────
+  /// 다크 모드 앱 배경 (가장 어두운 레이어)
+  static const Color darkBackground = Color(0xFF121212);
+
+  /// 다크 모드 사이드바 / 상단 바 배경
+  static const Color darkSurface = Color(0xFF1E1E1E);
+
+  /// 다크 모드 카드 / 컨테이너 배경
+  static const Color darkCard = Color(0xFF2C2C2C);
+
+  /// 다크 모드 테두리 / 구분선
+  static const Color darkBorder = Color(0xFF3D3D3D);
+
+  /// 다크 모드 기본 텍스트
+  static const Color darkText = Color(0xFFF0F0F0);
+
+  /// 다크 모드 보조 텍스트
+  static const Color darkSubtext = Color(0xFFA0A0A0);
 }
 
 // ── 텍스트 스타일 시스템 ──────────────────────────────────────────────────────

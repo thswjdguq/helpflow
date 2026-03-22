@@ -1,19 +1,31 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'app.dart';
+import 'firebase_options.dart';
 
 /// 앱 진입점
-/// Hive 초기화 및 ProviderScope 설정 후 앱 실행
+/// Hive 초기화 → Firebase 초기화 → ProviderScope → App 실행
 Future<void> main() async {
-  // Flutter 바인딩 초기화 (async main에서 필수)
+  // Flutter 엔진 바인딩 초기화 (async main에서 필수)
   WidgetsFlutterBinding.ensureInitialized();
 
   // Hive 로컬 DB 초기화
   await Hive.initFlutter();
 
-  // TODO: TicketModel Hive 어댑터 등록 (2주차 모델 구현 후 활성화)
-  // Hive.registerAdapter(TicketModelAdapter());
+  // Firebase 초기화
+  // firebase_options.dart가 플레이스홀더인 경우 예외를 잡고 계속 진행
+  // → 로그인 시도 시 에러 메시지로 안내됨
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    // 개발 중 플레이스홀더 상태에서는 무시하고 앱 실행 계속
+    // 실제 배포 전 flutterfire configure 실행 필요
+    debugPrint('[Firebase] 초기화 실패 (플레이스홀더 상태): $e');
+  }
 
   // ProviderScope로 전체 앱을 감싸서 Riverpod 상태 관리 활성화
   runApp(
@@ -25,6 +37,8 @@ Future<void> main() async {
 
 // ── [파일 요약] ───────────────────────────────────────────────────────────────
 // 파일명: main.dart
-// 역할: 앱 진입점. Hive.initFlutter()로 로컬 DB 초기화,
-//       ProviderScope로 Riverpod 활성화, App 위젯 실행.
-//       TicketModel 어댑터 등록은 2주차 모델 구현 후 활성화 예정.
+// 역할: 앱 진입점.
+//       Hive.initFlutter()로 로컬 DB 초기화.
+//       Firebase.initializeApp()으로 Firebase 초기화
+//         (플레이스홀더 상태에서 실패해도 앱은 계속 실행).
+//       ProviderScope로 Riverpod 활성화 후 App 위젯 실행.

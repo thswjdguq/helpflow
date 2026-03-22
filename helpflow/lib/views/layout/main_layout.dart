@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_sizes.dart';
 import '../../core/constants/app_strings.dart';
-import '../../core/design_system.dart';
 import '../../core/router/app_router.dart';
 import 'sidebar_widget.dart';
 import 'top_bar_widget.dart';
@@ -51,7 +50,7 @@ class _DesktopLayout extends StatelessWidget {
     final location = GoRouterState.of(context).matchedLocation;
 
     return Scaffold(
-      backgroundColor: HelpFlowColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Row(
         children: [
           // 좌측 사이드바 고정
@@ -94,7 +93,7 @@ class _TabletLayout extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: HelpFlowColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Row(
         children: [
           // 미니 레일 (아이콘만 표시, labelType: none)
@@ -169,7 +168,7 @@ class _MobileLayout extends StatelessWidget {
     final location = GoRouterState.of(context).matchedLocation;
 
     return Scaffold(
-      backgroundColor: HelpFlowColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
           // 상단 바 (scaffoldKey 없음 — 햄버거 버튼 미표시)
