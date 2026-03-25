@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/auth_provider.dart';
+import '../../features/auth/user_model.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/signup_screen.dart';
 import '../../views/layout/main_layout.dart';
@@ -56,8 +57,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   final notifier = _GoRouterNotifier();
 
   // authStateProvider(Firebase Auth 스트림) 변화를 감지해 GoRouter redirect 재실행
-  // ref.listen은 authStateProvider가 새 값을 방출할 때마다 콜백 실행
   ref.listen<AsyncValue<User?>>(authStateProvider, (_, _) {
+    notifier.notify();
+  });
+
+  // currentUserProvider 변화 시에도 redirect 재실행
+  // 로그인 직후 Firestore에서 역할 정보를 로드한 뒤 올바른 초기 화면으로 이동하기 위함
+  ref.listen<AsyncValue<UserModel?>>(currentUserProvider, (_, _) {
     notifier.notify();
   });
 
@@ -87,8 +93,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         data: (user) {
           // 미로그인 + 인증 화면 아님 → 로그인 화면으로 강제 이동
           if (user == null && !isOnAuthPage) return AppRoutes.login;
-          // 로그인 완료 + 인증 화면 접근 → 대시보드로 이동
-          if (user != null && isOnAuthPage) return AppRoutes.dashboard;
+
+          // 로그인 완료 + 인증 화면 → 역할에 따라 초기 화면 결정
+          if (user != null && isOnAuthPage) {
+            final currentUser = ref.read(currentUserProvider);
+            return currentUser.when(
+              data: (userData) {
+                // admin만 대시보드로, user/agent는 티켓 목록으로
+                if (userData?.role == UserRole.admin) {
+                  return AppRoutes.dashboard;
+                }
+                return AppRoutes.tickets;
+              },
+              // Firestore에서 역할 로딩 중 → 인증 화면에서 잠시 대기
+              loading: () => null,
+              error: (_, _) => AppRoutes.tickets,
+            );
+          }
+
           // 그 외: 현재 경로 유지
           return null;
         },
@@ -170,12 +192,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 // 역할: go_router 기반 앱 라우터 Provider 정의.
 //       AppRoutes: /login, /signup, /dashboard, /tickets, /tickets/new,
 //                  /tickets/:id, /settings 경로 상수 관리.
-//       _GoRouterNotifier: ref.listen(authStateProvider) 변화를 ChangeNotifier로 전달.
+//       _GoRouterNotifier: ref.listen(authStateProvider/currentUserProvider)
+//                          변화를 ChangeNotifier로 전달.
 //       appRouterProvider:
 //         - initialLocation: /login → 앱 시작 시 항상 로그인 화면 먼저.
 //         - redirect: Riverpod authStateProvider 기반으로 인증 상태 확인.
 //           · 미로그인 + 보호 경로 → /login 강제.
-//           · 로그인 + 인증 화면 → /dashboard 자동 이동.
+//           · 로그인 + 인증 화면 → 역할 기반 분기
+//             (admin → /dashboard, user/agent → /tickets).
 //           · 로딩/에러 → /login에서 대기 (보호 경로 차단).
 //         - /login, /signup은 ShellRoute 밖 (사이드바 없음).
 // 사용: app.dart에서 ref.watch(appRouterProvider)로 MaterialApp.router에 전달.

@@ -110,6 +110,24 @@ class AuthService {
   }
 
   // ────────────────────────────────────────────────────────────────────────────
+  // 사용자 조회
+  // ────────────────────────────────────────────────────────────────────────────
+
+  /// Firestore에서 사용자 정보를 조회합니다.
+  ///
+  /// [uid] Firebase Auth UID
+  /// 반환값: Firestore 문서가 있으면 UserModel, 없거나 에러 시 null
+  Future<UserModel?> getUserFromFirestore(String uid) async {
+    try {
+      final doc = await _usersRef.doc(uid).get();
+      if (!doc.exists) return null;
+      return UserModel.fromFirestore(doc);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
   // 로그아웃
   // ────────────────────────────────────────────────────────────────────────────
 
@@ -128,5 +146,6 @@ class AuthService {
 // 역할: Firebase Auth + Firestore 기반 인증 서비스.
 //       signInWithEmail() - 이메일 로그인 후 Firestore에서 UserModel 반환.
 //       signUpWithEmail() - 계정 생성 후 Firestore에 사용자 문서 저장.
+//       getUserFromFirestore() - UID로 Firestore 사용자 문서 조회 (역할 포함).
 //       signOut() - 로그아웃.
 //       모든 에러는 FirebaseService.handleFirebaseError()로 한글 변환 후 throw.

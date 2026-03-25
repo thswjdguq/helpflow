@@ -26,18 +26,21 @@ final authStateProvider = StreamProvider<User?>((ref) {
 /// 현재 로그인된 사용자의 UserModel 상태 관리
 /// AsyncNotifierProvider 패턴 사용
 class CurrentUserNotifier extends AsyncNotifier<UserModel?> {
-  /// 초기 상태 빌드: Firebase Auth 현재 사용자를 UserModel로 변환
+  /// 초기 상태 빌드: Firebase Auth 현재 사용자를 Firestore에서 조회해 UserModel로 반환
   /// authStateProvider 변화 시 자동으로 재실행됨
   @override
   Future<UserModel?> build() async {
-    // authStateProvider를 watch해서 로그인 상태 변화에 반응
+    // authStateProvider를 watch해서 로그인/로그아웃 변화에 반응
     final authState = ref.watch(authStateProvider);
 
     return authState.when(
       data: (user) async {
         if (user == null) return null;
-        // Firebase Auth 기본 정보를 UserModel로 래핑
-        // (Firestore 상세 정보는 signIn 시점에 별도 조회)
+        // Firestore에서 역할(role) 포함 사용자 정보 조회
+        final authService = ref.read(authServiceProvider);
+        final firestoreUser = await authService.getUserFromFirestore(user.uid);
+        if (firestoreUser != null) return firestoreUser;
+        // Firestore 문서가 없으면 Firebase Auth 기본 정보로 대체
         return UserModel(
           uid: user.uid,
           email: user.email ?? '',
