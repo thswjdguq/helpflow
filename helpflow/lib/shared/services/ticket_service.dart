@@ -62,6 +62,17 @@ class TicketService {
     });
   }
 
+  /// 단일 티켓을 ID로 실시간 구독합니다.
+  ///
+  /// [id] 구독할 티켓의 Firestore 문서 ID
+  /// 반환값: 변경될 때마다 새 값을 방출하는 Stream (문서 없으면 null 방출)
+  Stream<TicketModel?> getTicketStream(String id) {
+    return _ticketsRef.doc(id).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      return TicketModel.fromFirestore(doc);
+    });
+  }
+
   /// 단일 티켓을 ID로 조회합니다.
   ///
   /// [id] 조회할 티켓의 Firestore 문서 ID
@@ -153,8 +164,8 @@ class TicketService {
 // ── [파일 요약] ───────────────────────────────────────────────────────────────
 // 파일명: ticket_service.dart
 // 역할: Firestore 'tickets' 컬렉션에 대한 CRUD 서비스 레이어.
-//       createTicket / getTickets / getTicketById / updateTicket /
-//       updateTicketStatus / deleteTicket 메서드 제공.
-//       getTickets / getTicketsByReporter는 Stream 반환 (실시간 업데이트).
+//       createTicket / getTickets / getTicketStream / getTicketById /
+//       updateTicket / updateTicketStatus / deleteTicket 메서드 제공.
+//       getTickets / getTicketsByReporter / getTicketStream은 Stream 반환 (실시간).
 //       모든 FirebaseException을 한글 메시지로 변환해 throw.
 // ─────────────────────────────────────────────────────────────────────────────
