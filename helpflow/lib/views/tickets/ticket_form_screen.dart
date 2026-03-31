@@ -1,6 +1,10 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_sizes.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/design_system.dart';
@@ -42,6 +46,12 @@ class _TicketFormScreenState extends ConsumerState<TicketFormScreen> {
   /// 제출 중 로딩 상태 (버튼 비활성화 용도)
   bool _isLoading = false;
 
+  /// 선택된 이미지 파일 목록 (최대 3장)
+  final List<XFile> _selectedImages = [];
+
+  /// image_picker 인스턴스
+  final ImagePicker _picker = ImagePicker();
+
   @override
   void dispose() {
     _titleController.dispose();
@@ -49,8 +59,26 @@ class _TicketFormScreenState extends ConsumerState<TicketFormScreen> {
     super.dispose();
   }
 
+  /// 갤러리에서 이미지 선택 (최대 3장 제한)
+  Future<void> _pickImages() async {
+    final remaining = 3 - _selectedImages.length;
+    if (remaining <= 0) return;
+
+    final picked = await _picker.pickMultiImage(limit: remaining);
+    if (picked.isEmpty) return;
+
+    setState(() {
+      _selectedImages.addAll(picked);
+    });
+  }
+
+  /// 선택된 이미지 제거
+  void _removeImage(int index) {
+    setState(() => _selectedImages.removeAt(index));
+  }
+
   /// 폼 제출 처리
-  /// 유효성 검사 → TicketModel 생성 → Firestore 저장 → /tickets로 이동
+  /// 유효성 검사 → 이미지 업로드 → TicketModel 생성 → Firestore 저장 → /tickets로 이동
   Future<void> _submit() async {
     // 유효성 검사 실패 시 중단
     if (!_formKey.currentState!.validate()) return;
@@ -62,6 +90,16 @@ class _TicketFormScreenState extends ConsumerState<TicketFormScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // 이미지가 있으면 Storage 업로드 후 URL 수집
+      List<String> imageUrls = const [];
+      if (_selectedImages.isNotEmpty) {
+        // 임시 ID로 업로드 (티켓 ID는 Firestore 저장 후 확정되므로 uid 사용)
+        imageUrls = await ref.read(storageServiceProvider).uploadTicketImages(
+              ticketId: 'tmp_${currentUser.uid}_${DateTime.now().millisecondsSinceEpoch}',
+              images: _selectedImages,
+            );
+      }
+
       final now = DateTime.now();
       final ticket = TicketModel(
         id: '', // Firestore가 자동 생성
@@ -71,7 +109,7 @@ class _TicketFormScreenState extends ConsumerState<TicketFormScreen> {
         priority: _priority,
         category: _category,
         reporterId: currentUser.uid,
-        imageUrls: const [],
+        imageUrls: imageUrls,
         createdAt: now,
         updatedAt: now,
       );
@@ -222,6 +260,106 @@ class _TicketFormScreenState extends ConsumerState<TicketFormScreen> {
                     ),
                   ),
                 ],
+              ),
+
+              const SizedBox(height: AppSizes.paddingMd),
+
+              // ── 이미지 첨부 (최대 3장) ──────────────────────────────────
+              Text(
+                '첨부 이미지 (선택, 최대 3장)',
+                style: AppTextStyles.cardTitle.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: AppSizes.paddingSm),
+              // 선택된 이미지 미리보기 + 추가 버튼
+              SizedBox(
+                height: 100,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    // 선택된 이미지 썸네일
+                    ..._selectedImages.asMap().entries.map((entry) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: AppSizes.paddingSm),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: kIsWeb
+                                  ? Image.network(
+                                      entry.value.path,
+                                      width: 100,
+                                      height: 100,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Image.file(
+                                      File(entry.value.path),
+                                      width: 100,
+                                      height: 100,
+                                      fit: BoxFit.cover,
+                                    ),
+                            ),
+                            // 삭제 버튼
+                            Positioned(
+                              top: -6,
+                              right: -6,
+                              child: GestureDetector(
+                                onTap: () => _removeImage(entry.key),
+                                child: Container(
+                                  width: 20,
+                                  height: 20,
+                                  decoration: BoxDecoration(
+                                    color: HelpFlowColors.error,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.close,
+                                    size: 12,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    // 이미지 추가 버튼 (3장 미만일 때만)
+                    if (_selectedImages.length < 3)
+                      GestureDetector(
+                        onTap: _isLoading ? null : _pickImages,
+                        child: Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: theme.colorScheme.outlineVariant,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                            color: theme.colorScheme.surfaceContainerLowest,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.add_photo_alternate_outlined,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '사진 추가',
+                                style: AppTextStyles.bodySm.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
 
               const SizedBox(height: AppSizes.paddingXl),
