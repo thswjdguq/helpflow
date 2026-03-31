@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/auth/auth_provider.dart';
 import '../../shared/models/ticket_model.dart';
 import '../../shared/services/ticket_service.dart';
+import '../../shared/services/storage_service.dart';
 
 // ── TicketService 프로바이더 ─────────────────────────────────────────────────
 
@@ -10,6 +11,12 @@ import '../../shared/services/ticket_service.dart';
 /// CRUD 메서드 호출 시 ref.read(ticketServiceProvider)로 접근
 final ticketServiceProvider = Provider<TicketService>((ref) {
   return TicketService();
+});
+
+/// StorageService 싱글턴 프로바이더
+/// 이미지 업로드 시 ref.read(storageServiceProvider)로 접근
+final storageServiceProvider = Provider<StorageService>((ref) {
+  return StorageService();
 });
 
 // ── 전체 티켓 목록 Stream 프로바이더 ─────────────────────────────────────────
