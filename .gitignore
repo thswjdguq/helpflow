@@ -1,0 +1,6 @@
+# Android 빌드 산출물
+helpflow/android/build/
+
+# Node.js (Firebase CLI 등 로컬 도구)
+node_modules/
+package-lock.json
