@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_sizes.dart';
 import '../../core/design_system.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../features/admin/user_provider.dart';
 import '../../features/auth/auth_provider.dart';
 import '../../features/auth/user_model.dart';
 import '../../features/tickets/ticket_provider.dart';
@@ -242,33 +243,79 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
     }
   }
 
-  /// admin 전용: 담당자 배정 다이얼로그
+  /// admin 전용: 담당자 배정 다이얼로그 (agent 목록 선택)
   Future<void> _showAssignDialog() async {
-    final controller = TextEditingController(
-      text: widget.ticket.agentId ?? '',
-    );
+    // Riverpod에서 agent 목록 읽기
+    final agentsAsync = ref.read(agentListProvider);
+    final agents = agentsAsync.value ?? [];
+
+    if (agents.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('등록된 담당자가 없습니다. 먼저 사용자 역할을 agent로 변경해주세요.')),
+        );
+      }
+      return;
+    }
+
+    // 현재 배정된 담당자 기본 선택
+    String? selectedUid = widget.ticket.agentId;
+    if (selectedUid != null &&
+        !agents.any((a) => a.uid == selectedUid)) {
+      selectedUid = null;
+    }
 
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('담당자 배정'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: '담당자 UID',
-            hintText: 'Firebase Auth UID를 입력하세요',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text('담당자 배정'),
+          content: SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: agents.map((agent) {
+                final isSelected = selectedUid == agent.uid;
+                return ListTile(
+                  dense: true,
+                  leading: CircleAvatar(
+                    radius: 16,
+                    backgroundColor: const Color(0xFF1565C0).withValues(alpha: 0.15),
+                    child: Text(
+                      agent.name.isNotEmpty ? agent.name[0].toUpperCase() : '?',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1565C0),
+                      ),
+                    ),
+                  ),
+                  title: Text(agent.name),
+                  subtitle: Text(
+                    agent.email,
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  trailing: isSelected
+                      ? const Icon(Icons.check_circle, color: Color(0xFF1565C0))
+                      : null,
+                  onTap: () => setState(() => selectedUid = agent.uid),
+                );
+              }).toList(),
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: selectedUid == null
+                  ? null
+                  : () => Navigator.pop(ctx, selectedUid),
+              child: const Text('배정'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('배정'),
-          ),
-        ],
       ),
     );
 
