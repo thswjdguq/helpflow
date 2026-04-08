@@ -1,3 +1,4 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -43,7 +44,7 @@ class DashboardScreen extends ConsumerWidget {
 
           const SizedBox(height: AppSizes.paddingXl),
 
-          // ── 차트 플레이스홀더 (7~8주차 fl_chart 연동 예정) ────────────
+          // ── 티켓 상태별 바 차트 (fl_chart) ──────────────────────────
           Text(
             '티켓 현황 차트',
             style: AppTextStyles.sectionTitle.copyWith(
@@ -51,7 +52,7 @@ class DashboardScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: AppSizes.paddingMd),
-          const _ChartPlaceholder(),
+          const _StatusBarChart(),
 
           const SizedBox(height: AppSizes.paddingXl),
 
@@ -190,41 +191,151 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-// ── 차트 플레이스홀더 ─────────────────────────────────────────────────────────
+// ── 티켓 상태별 바 차트 ───────────────────────────────────────────────────────
 
-/// 7~8주차 fl_chart 연동 전까지 표시할 플레이스홀더
-class _ChartPlaceholder extends StatelessWidget {
-  const _ChartPlaceholder();
+/// ticketStatsProvider를 구독해 상태별 티켓 수를 바 차트로 표시
+class _StatusBarChart extends ConsumerWidget {
+  const _StatusBarChart();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statsAsync = ref.watch(ticketStatsProvider);
+
+    return statsAsync.when(
+      data: (stats) => _BarChartContent(stats: stats),
+      loading: () => const SizedBox(
+        height: 220,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, _) => const SizedBox.shrink(),
+    );
+  }
+}
+
+/// 실제 BarChart 렌더링 위젯
+class _BarChartContent extends StatelessWidget {
+  final TicketStats stats;
+
+  const _BarChartContent({required this.stats});
+
+  // 상태별 색상
+  static const _colors = [
+    Color(0xFF1565C0), // 신규 — 파랑
+    Color(0xFFFB8C00), // 처리중 — 주황
+    Color(0xFF43A047), // 해결됨 — 초록
+    Color(0xFF757575), // 종료 — 회색
+  ];
+
+  static const _labels = ['신규', '처리중', '해결됨', '종료'];
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final counts = [
+      stats.newCount.toDouble(),
+      stats.inProgress.toDouble(),
+      stats.resolved.toDouble(),
+      stats.closed.toDouble(),
+    ];
+    // Y축 최댓값: 최소 5 이상, 실제 최댓값 + 여유 1
+    final maxY = (counts.reduce((a, b) => a > b ? a : b) + 1).clamp(5, 9999).toDouble();
 
-    return Container(
-      width: double.infinity,
-      height: 200,
-      decoration: BoxDecoration(
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(AppSizes.cardRadius),
-        color: theme.colorScheme.surfaceContainerLowest,
-      ),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.bar_chart_outlined,
-              size: 48,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: AppSizes.paddingSm),
-            Text(
-              AppStrings.dashboardChartPlaceholder,
-              style: AppTextStyles.bodyMd.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSizes.paddingMd,
+          AppSizes.paddingLg,
+          AppSizes.paddingLg,
+          AppSizes.paddingMd,
+        ),
+        child: SizedBox(
+          height: 220,
+          child: BarChart(
+            BarChartData(
+              maxY: maxY,
+              alignment: BarChartAlignment.spaceAround,
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipColor: (_) =>
+                      theme.colorScheme.inverseSurface.withValues(alpha: 0.9),
+                  getTooltipItem: (group, _, rod, _) => BarTooltipItem(
+                    '${_labels[group.x]}\n${rod.toY.toInt()}건',
+                    AppTextStyles.bodySm.copyWith(
+                      color: theme.colorScheme.onInverseSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ),
+              titlesData: FlTitlesData(
+                // X축: 상태 레이블
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 30,
+                    getTitlesWidget: (value, _) => Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        _labels[value.toInt()],
+                        style: AppTextStyles.bodySm.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                // Y축: 건수 (정수)
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 28,
+                    interval: maxY <= 5 ? 1 : (maxY / 5).ceilToDouble(),
+                    getTitlesWidget: (value, _) => Text(
+                      value.toInt().toString(),
+                      style: AppTextStyles.bodySm.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                getDrawingHorizontalLine: (_) => FlLine(
+                  color: theme.colorScheme.outlineVariant,
+                  strokeWidth: 1,
+                ),
+              ),
+              borderData: FlBorderData(show: false),
+              barGroups: List.generate(4, (i) {
+                return BarChartGroupData(
+                  x: i,
+                  barRods: [
+                    BarChartRodData(
+                      toY: counts[i],
+                      color: _colors[i],
+                      width: 28,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(4),
+                      ),
+                      backDrawRodData: BackgroundBarChartRodData(
+                        show: true,
+                        toY: maxY,
+                        color: _colors[i].withValues(alpha: 0.07),
+                      ),
+                    ),
+                  ],
+                );
+              }),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -368,8 +479,8 @@ class _MiniChip extends StatelessWidget {
 // 파일명: dashboard_screen.dart
 // 역할: 대시보드 메인 화면. Firestore 실시간 통계 및 최근 티켓 표시.
 //       _StatCardGrid: ticketStatsProvider로 전체/신규/처리중/해결됨 카드.
+//       _StatusBarChart: fl_chart BarChart — 상태별(신규/처리중/해결됨/종료) 건수 시각화.
 //       _RecentTicketList: recentTicketsProvider로 최근 5개 티켓 목록.
-//       _ChartPlaceholder: 7~8주차 fl_chart 연동 전 플레이스홀더 유지.
 //       최근 티켓 타일 클릭 시 /tickets/:id 상세 화면으로 이동.
 // 연관 파일: dashboard_provider.dart, ticket_model.dart
 // ─────────────────────────────────────────────────────────────────────────────

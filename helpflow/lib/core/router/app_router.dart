@@ -6,6 +6,7 @@ import '../../features/auth/auth_provider.dart';
 import '../../features/auth/user_model.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/signup_screen.dart';
+import '../../features/auth/splash_screen.dart';
 import '../../views/layout/main_layout.dart';
 import '../../views/dashboard/dashboard_screen.dart';
 import '../../views/tickets/ticket_list_screen.dart';
@@ -19,6 +20,9 @@ import '../../views/settings/settings_screen.dart';
 /// 경로 문자열을 한 곳에서 관리해 오타 및 변경 시 실수 방지
 class AppRoutes {
   AppRoutes._();
+
+  // 스플래시 (앱 시작 로딩)
+  static const String splash = '/splash';
 
   // 인증 화면 (ShellRoute 밖 — 사이드바 없음)
   static const String login = '/login';
@@ -68,10 +72,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   });
 
   return GoRouter(
-    // ── 앱 시작 위치: 항상 /login ─────────────────────────────────────────
-    // redirect 콜백이 로그인 상태를 확인해 /dashboard로 자동 이동
-    // 이 설정으로 비로그인 상태에서 /dashboard 직접 접근을 완전히 차단
-    initialLocation: AppRoutes.login,
+    // ── 앱 시작 위치: 스플래시 ──────────────────────────────────────────
+    // Firebase Auth 초기화 중 스플래시를 표시하고,
+    // 완료되면 redirect가 인증 상태에 따라 알맞은 화면으로 자동 이동
+    initialLocation: AppRoutes.splash,
     refreshListenable: notifier,
 
     // ── 인증 상태 기반 리다이렉트 ─────────────────────────────────────────
@@ -80,50 +84,71 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // 현재 접근 중인 경로
       final location = state.matchedLocation;
 
-      // 인증 화면(/login, /signup) 여부
+      // 각 화면 여부 판별
+      final isOnSplash = location == AppRoutes.splash;
       final isOnAuthPage =
           location == AppRoutes.login || location == AppRoutes.signup;
 
       // Riverpod에서 현재 인증 상태를 동기적으로 읽기
-      // authStateProvider는 Firebase Auth authStateChanges 스트림
       final authState = ref.read(authStateProvider);
 
       return authState.when(
         // ── 인증 상태 확인 완료 ──────────────────────────────────────────
         data: (user) {
-          // 미로그인 + 인증 화면 아님 → 로그인 화면으로 강제 이동
-          if (user == null && !isOnAuthPage) return AppRoutes.login;
-
-          // 로그인 완료 + 인증 화면 → 역할에 따라 초기 화면 결정
-          if (user != null && isOnAuthPage) {
+          // 역할 기반 초기 화면 결정 헬퍼
+          String roleBasedHome() {
             final currentUser = ref.read(currentUserProvider);
             return currentUser.when(
-              data: (userData) {
-                // admin만 대시보드로, user/agent는 티켓 목록으로
-                if (userData?.role == UserRole.admin) {
-                  return AppRoutes.dashboard;
-                }
-                return AppRoutes.tickets;
-              },
-              // Firestore에서 역할 로딩 중 → 인증 화면에서 잠시 대기
-              loading: () => null,
+              data: (userData) =>
+                  userData?.role == UserRole.admin
+                      ? AppRoutes.dashboard
+                      : AppRoutes.tickets,
+              loading: () => AppRoutes.tickets,
               error: (_, _) => AppRoutes.tickets,
             );
           }
 
+          // 스플래시 → 인증 완료 후 즉시 분기
+          if (isOnSplash) {
+            if (user == null) return AppRoutes.login;
+            // Firestore 역할 로딩 중이면 잠시 스플래시에서 대기
+            final currentUser = ref.read(currentUserProvider);
+            return currentUser.when(
+              data: (userData) =>
+                  userData?.role == UserRole.admin
+                      ? AppRoutes.dashboard
+                      : AppRoutes.tickets,
+              loading: () => null, // 역할 로딩 완료까지 스플래시 유지
+              error: (_, _) => AppRoutes.tickets,
+            );
+          }
+
+          // 미로그인 + 보호 경로 → 로그인 화면으로 강제 이동
+          if (user == null && !isOnAuthPage) return AppRoutes.login;
+
+          // 로그인 완료 + 인증 화면 → 역할에 따라 초기 화면 결정
+          if (user != null && isOnAuthPage) return roleBasedHome();
+
           // 그 외: 현재 경로 유지
           return null;
         },
-        // ── 인증 상태 로딩 중 ────────────────────────────────────────────
-        // Firebase Auth 초기화 중: 인증 화면이 아니면 /login에서 대기
-        loading: () => isOnAuthPage ? null : AppRoutes.login,
-        // ── 인증 에러 (Firebase 미초기화 등) ────────────────────────────
-        // 에러 시에도 보호 경로 접근 차단
+        // ── Firebase Auth 초기화 중 ──────────────────────────────────────
+        // 스플래시에서는 대기, 다른 경로면 스플래시로 이동
+        loading: () => isOnSplash ? null : AppRoutes.splash,
+        // ── 인증 에러 ────────────────────────────────────────────────────
         error: (_, _) => isOnAuthPage ? null : AppRoutes.login,
       );
     },
 
     routes: [
+      // ── 스플래시 (앱 시작 로딩, ShellRoute 밖) ──────────────────────
+      GoRoute(
+        path: AppRoutes.splash,
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: SplashScreen(),
+        ),
+      ),
+
       // ── 인증 화면 (사이드바 없음, ShellRoute 밖) ─────────────────────
       GoRoute(
         path: AppRoutes.login,
