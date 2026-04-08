@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_sizes.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/router/app_router.dart';
+import '../../features/auth/auth_provider.dart';
+import '../../features/auth/user_model.dart';
 import 'sidebar_widget.dart';
 import 'top_bar_widget.dart';
 
@@ -75,63 +78,69 @@ class _DesktopLayout extends StatelessWidget {
 
 // ── 태블릿 레이아웃 ───────────────────────────────────────────────────────────
 /// NavigationRail(아이콘만, 64px) + 메인 영역 배치
-class _TabletLayout extends StatelessWidget {
+/// admin 역할이면 '사용자 관리' 레일 항목 추가
+class _TabletLayout extends ConsumerWidget {
   final Widget child;
 
   const _TabletLayout({required this.child});
 
-  /// 현재 경로를 NavigationRail selectedIndex로 변환
-  int _selectedIndex(String location) {
-    if (location.startsWith(AppRoutes.tickets)) return 1;
-    if (location.startsWith(AppRoutes.settings)) return 2;
-    return 0;
-  }
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).matchedLocation;
     final theme = Theme.of(context);
+    final isAdmin =
+        ref.watch(currentUserProvider).value?.role == UserRole.admin;
+
+    // admin 여부에 따라 목적지 목록 구성
+    final routes = [
+      AppRoutes.dashboard,
+      AppRoutes.tickets,
+      if (isAdmin) AppRoutes.users,
+      AppRoutes.settings,
+    ];
+
+    int selectedIndex = routes.indexWhere(
+      (r) => r != AppRoutes.dashboard
+          ? location.startsWith(r)
+          : location == AppRoutes.dashboard || location == '/',
+    );
+    if (selectedIndex < 0) selectedIndex = 0;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Row(
         children: [
-          // 미니 레일 (아이콘만 표시, labelType: none)
           NavigationRail(
-            selectedIndex: _selectedIndex(location),
+            selectedIndex: selectedIndex,
             labelType: NavigationRailLabelType.none,
             minWidth: AppSizes.railWidth,
             backgroundColor: theme.colorScheme.surfaceContainerLow,
-            onDestinationSelected: (index) {
-              switch (index) {
-                case 0:
-                  context.go(AppRoutes.dashboard);
-                case 1:
-                  context.go(AppRoutes.tickets);
-                case 2:
-                  context.go(AppRoutes.settings);
-              }
-            },
-            destinations: const [
-              NavigationRailDestination(
+            onDestinationSelected: (index) =>
+                context.go(routes[index]),
+            destinations: [
+              const NavigationRailDestination(
                 icon: Icon(Icons.dashboard_outlined),
                 selectedIcon: Icon(Icons.dashboard),
                 label: Text(AppStrings.navDashboard),
               ),
-              NavigationRailDestination(
+              const NavigationRailDestination(
                 icon: Icon(Icons.confirmation_number_outlined),
                 selectedIcon: Icon(Icons.confirmation_number),
                 label: Text(AppStrings.navTickets),
               ),
-              NavigationRailDestination(
+              if (isAdmin)
+                const NavigationRailDestination(
+                  icon: Icon(Icons.group_outlined),
+                  selectedIcon: Icon(Icons.group),
+                  label: Text(AppStrings.navUsers),
+                ),
+              const NavigationRailDestination(
                 icon: Icon(Icons.settings_outlined),
                 selectedIcon: Icon(Icons.settings),
                 label: Text(AppStrings.navSettings),
               ),
             ],
           ),
-
-          // 우측 메인 영역
           Expanded(
             child: Column(
               children: [
@@ -148,69 +157,62 @@ class _TabletLayout extends StatelessWidget {
 
 // ── 모바일 레이아웃 ───────────────────────────────────────────────────────────
 /// 하단 내비게이션 바 + 상단 바 + 콘텐츠 배치
-/// 항목: 홈(대시보드) / 티켓 / 리포트 / 설정
-class _MobileLayout extends StatelessWidget {
+/// admin 역할이면 '사용자 관리' 탭 추가
+class _MobileLayout extends ConsumerWidget {
   final Widget child;
 
   const _MobileLayout({required this.child});
 
-  /// 현재 경로를 BottomNavigationBar selectedIndex로 변환
-  /// 0: 홈(대시보드), 1: 티켓, 2: 리포트(미구현), 3: 설정
-  int _selectedIndex(String location) {
-    if (location.startsWith(AppRoutes.tickets)) return 1;
-    if (location.startsWith(AppRoutes.settings)) return 3;
-    // 리포트 탭(index 2)은 추후 라우트 구현 예정
-    return 0;
-  }
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).matchedLocation;
+    final isAdmin =
+        ref.watch(currentUserProvider).value?.role == UserRole.admin;
+
+    // 역할에 따라 탭 목적지 구성
+    final routes = [
+      AppRoutes.dashboard,
+      AppRoutes.tickets,
+      if (isAdmin) AppRoutes.users,
+      AppRoutes.settings,
+    ];
+
+    int selectedIndex = routes.indexWhere(
+      (r) => r != AppRoutes.dashboard
+          ? location.startsWith(r)
+          : location == AppRoutes.dashboard || location == '/',
+    );
+    if (selectedIndex < 0) selectedIndex = 0;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
-          // 상단 바 (scaffoldKey 없음 — 햄버거 버튼 미표시)
           const TopBarWidget(),
-          // 실제 화면 콘텐츠
           Expanded(child: child),
         ],
       ),
-      // ── 하단 내비게이션 바 (모바일 전용) ──────────────
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex(location),
-        onTap: (index) {
-          switch (index) {
-            case 0:
-              context.go(AppRoutes.dashboard);
-            case 1:
-              context.go(AppRoutes.tickets);
-            case 2:
-              // 리포트 화면 추후 구현 예정 — 현재는 이동하지 않음
-              break;
-            case 3:
-              context.go(AppRoutes.settings);
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(
+        currentIndex: selectedIndex,
+        onTap: (index) => context.go(routes[index]),
+        items: [
+          const BottomNavigationBarItem(
             icon: Icon(Icons.dashboard_outlined),
             activeIcon: Icon(Icons.dashboard),
             label: AppStrings.navDashboard,
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(Icons.confirmation_number_outlined),
             activeIcon: Icon(Icons.confirmation_number),
             label: AppStrings.navTickets,
           ),
-          // 리포트: 7~8주차 fl_chart 연동 후 라우트 추가 예정
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart_outlined),
-            activeIcon: Icon(Icons.bar_chart),
-            label: '리포트',
-          ),
-          BottomNavigationBarItem(
+          if (isAdmin)
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.group_outlined),
+              activeIcon: Icon(Icons.group),
+              label: AppStrings.navUsers,
+            ),
+          const BottomNavigationBarItem(
             icon: Icon(Icons.settings_outlined),
             activeIcon: Icon(Icons.settings),
             label: AppStrings.navSettings,

@@ -12,6 +12,7 @@ import '../../views/dashboard/dashboard_screen.dart';
 import '../../views/tickets/ticket_list_screen.dart';
 import '../../views/tickets/ticket_detail_screen.dart';
 import '../../views/tickets/ticket_form_screen.dart';
+import '../../views/admin/user_management_screen.dart';
 import '../../views/settings/settings_screen.dart';
 
 // ── 경로 상수 ───────────────────────────────────────────────────────────────
@@ -33,6 +34,7 @@ class AppRoutes {
   static const String tickets = '/tickets';
   static const String ticketDetail = '/tickets/:id';
   static const String ticketNew = '/tickets/new';
+  static const String users = '/users';
   static const String settings = '/settings';
 }
 
@@ -196,6 +198,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 child: TicketDetailScreen(ticketId: ticketId),
               );
             },
+          ),
+          GoRoute(
+            path: AppRoutes.users,
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: UserManagementScreen(),
+            ),
           ),
           GoRoute(
             path: AppRoutes.settings,

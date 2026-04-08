@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_sizes.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../features/auth/auth_provider.dart';
+import '../../features/auth/user_model.dart';
 
 /// 사이드바 네비게이션 항목 데이터 모델
 class _NavItem {
@@ -23,7 +26,8 @@ class _NavItem {
 /// 사이드바 위젯
 /// 데스크탑 모드에서 항상 표시되는 전체 사이드바
 /// 현재 경로 기반 활성 항목 강조, AnimatedContainer 전환 효과 포함
-class SidebarWidget extends StatelessWidget {
+/// admin 역할일 때만 '사용자 관리' 메뉴를 추가로 표시
+class SidebarWidget extends ConsumerWidget {
   /// 현재 활성화된 경로 (GoRouter에서 전달)
   final String currentPath;
 
@@ -36,8 +40,8 @@ class SidebarWidget extends StatelessWidget {
     this.onClose,
   });
 
-  // ── 네비게이션 항목 목록 ─────────────────────────
-  static const List<_NavItem> _navItems = [
+  // ── 공통 네비게이션 항목 ──────────────────────────
+  static const List<_NavItem> _commonItems = [
     _NavItem(
       label: AppStrings.navDashboard,
       icon: Icons.dashboard_outlined,
@@ -50,13 +54,22 @@ class SidebarWidget extends StatelessWidget {
       activeIcon: Icons.confirmation_number,
       route: AppRoutes.tickets,
     ),
-    _NavItem(
-      label: AppStrings.navSettings,
-      icon: Icons.settings_outlined,
-      activeIcon: Icons.settings,
-      route: AppRoutes.settings,
-    ),
   ];
+
+  // ── admin 전용 항목 ───────────────────────────────
+  static const _NavItem _usersItem = _NavItem(
+    label: AppStrings.navUsers,
+    icon: Icons.group_outlined,
+    activeIcon: Icons.group,
+    route: AppRoutes.users,
+  );
+
+  static const _NavItem _settingsItem = _NavItem(
+    label: AppStrings.navSettings,
+    icon: Icons.settings_outlined,
+    activeIcon: Icons.settings,
+    route: AppRoutes.settings,
+  );
 
   /// 현재 경로가 해당 navItem의 경로와 일치하는지 확인
   bool _isActive(String route) {
@@ -67,8 +80,17 @@ class SidebarWidget extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final role = ref.watch(currentUserProvider).value?.role;
+    final isAdmin = role == UserRole.admin;
+
+    // 역할에 따라 메뉴 구성
+    final navItems = [
+      ..._commonItems,
+      if (isAdmin) _usersItem,
+      _settingsItem,
+    ];
 
     return Container(
       width: AppSizes.sidebarWidth,
@@ -119,9 +141,9 @@ class SidebarWidget extends StatelessWidget {
                 horizontal: AppSizes.paddingSm,
                 vertical: AppSizes.paddingXs,
               ),
-              itemCount: _navItems.length,
+              itemCount: navItems.length,
               itemBuilder: (context, index) {
-                final item = _navItems[index];
+                final item = navItems[index];
                 final active = _isActive(item.route);
                 return _NavItemTile(
                   item: item,

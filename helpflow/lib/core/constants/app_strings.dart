@@ -10,6 +10,7 @@ class AppStrings {
   // ── 네비게이션 메뉴 ───────────────────────────────
   static const String navDashboard = '대시보드';
   static const String navTickets = '티켓 관리';
+  static const String navUsers = '사용자 관리';
   static const String navSettings = '설정';
 
   // ── 대시보드 화면 ─────────────────────────────────
