@@ -34,6 +34,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   /// 서버에서 받은 에러 메시지 (null이면 표시 안 함)
   String? _errorMessage;
 
+  /// 비밀번호 표시 여부 (기본: 숨김)
+  bool _obscurePassword = true;
+
   @override
   void dispose() {
     // 위젯 소멸 시 컨트롤러 메모리 해제
@@ -114,6 +117,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   nameController: _nameController,
                   emailController: _emailController,
                   passwordController: _passwordController,
+                  obscurePassword: _obscurePassword,
+                  onToggleObscure: () =>
+                      setState(() => _obscurePassword = !_obscurePassword),
                 ),
                 const SizedBox(height: HelpFlowSpacing.lg),
                 // 에러 메시지: 있을 때만 표시
@@ -177,12 +183,18 @@ class _SignupForm extends StatelessWidget {
     required this.nameController,
     required this.emailController,
     required this.passwordController,
+    required this.obscurePassword,
+    required this.onToggleObscure,
   });
 
   final GlobalKey<FormState> formKey;
   final TextEditingController nameController;
   final TextEditingController emailController;
   final TextEditingController passwordController;
+  /// 비밀번호 숨김 여부
+  final bool obscurePassword;
+  /// 눈 아이콘 클릭 시 토글 콜백
+  final VoidCallback onToggleObscure;
 
   @override
   Widget build(BuildContext context) {
@@ -227,14 +239,23 @@ class _SignupForm extends StatelessWidget {
             },
           ),
           const SizedBox(height: HelpFlowSpacing.md),
-          // 비밀번호 입력 필드 (obscureText로 마스킹)
+          // 비밀번호 입력 필드 (눈 아이콘으로 보기/숨기기 토글)
           TextFormField(
             controller: passwordController,
-            obscureText: true,
-            decoration: const InputDecoration(
+            obscureText: obscurePassword,
+            decoration: InputDecoration(
               labelText: '비밀번호',
               hintText: '6자 이상 입력',
-              prefixIcon: Icon(Icons.lock_outline),
+              prefixIcon: const Icon(Icons.lock_outline),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  obscurePassword
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                ),
+                onPressed: onToggleObscure,
+                tooltip: obscurePassword ? '비밀번호 표시' : '비밀번호 숨기기',
+              ),
             ),
             validator: (value) {
               if (value == null || value.isEmpty) return '비밀번호를 입력해주세요.';

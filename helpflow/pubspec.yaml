@@ -34,8 +34,11 @@ dependencies:
   # 이미지 선택 (티켓 첨부 이미지)
   image_picker: ^1.1.2
 
-  # 차트 (7~8주차 활성화 예정)
-  # fl_chart: ^0.68.0
+  # 차트
+  fl_chart: ^0.68.0
+
+  # 한글 폰트 (Noto Sans KR — 한글 입력 시 □× 버그 방지)
+  google_fonts: ^6.2.1
 
 dev_dependencies:
   flutter_test:

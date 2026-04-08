@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../design_system.dart';
 
 /// 앱 전체 Material 3 테마 정의
@@ -35,6 +36,18 @@ class AppTheme {
       colorScheme: colorScheme,
       // 스캐폴드 배경: 순백색
       scaffoldBackgroundColor: HelpFlowColors.background,
+
+      // ── 폰트: Noto Sans KR ──
+      // CanvasKit 렌더러에서 한글 글리프가 없으면 □× 로 표시되는 문제 방지
+      textTheme: GoogleFonts.notoSansKrTextTheme(const TextTheme(
+        displayLarge: HelpFlowTextStyles.headline1,
+        displayMedium: HelpFlowTextStyles.headline2,
+        displaySmall: HelpFlowTextStyles.headline3,
+        bodyLarge: HelpFlowTextStyles.body1,
+        bodyMedium: HelpFlowTextStyles.body2,
+        bodySmall: HelpFlowTextStyles.caption,
+        labelLarge: HelpFlowTextStyles.button,
+      )),
 
       // ── AppBar ──
       appBarTheme: const AppBarTheme(
@@ -95,16 +108,6 @@ class AppTheme {
         space: 1,
       ),
 
-      // ── TextTheme ──
-      textTheme: const TextTheme(
-        displayLarge: HelpFlowTextStyles.headline1,
-        displayMedium: HelpFlowTextStyles.headline2,
-        displaySmall: HelpFlowTextStyles.headline3,
-        bodyLarge: HelpFlowTextStyles.body1,
-        bodyMedium: HelpFlowTextStyles.body2,
-        bodySmall: HelpFlowTextStyles.caption,
-        labelLarge: HelpFlowTextStyles.button,
-      ),
     );
   }
 
@@ -135,6 +138,17 @@ class AppTheme {
       colorScheme: colorScheme,
       // 스캐폴드 배경: 가장 어두운 #121212
       scaffoldBackgroundColor: HelpFlowColors.darkBackground,
+
+      // ── 폰트: Noto Sans KR (다크 모드도 동일 적용)
+      textTheme: GoogleFonts.notoSansKrTextTheme(const TextTheme(
+        displayLarge: HelpFlowTextStyles.headline1,
+        displayMedium: HelpFlowTextStyles.headline2,
+        displaySmall: HelpFlowTextStyles.headline3,
+        bodyLarge: HelpFlowTextStyles.body1,
+        bodyMedium: HelpFlowTextStyles.body2,
+        bodySmall: HelpFlowTextStyles.caption,
+        labelLarge: HelpFlowTextStyles.button,
+      )),
 
       // ── AppBar ——
       // 사이드바(#1E1E1E)와 동일한 색상으로 일체감 유지
@@ -198,16 +212,6 @@ class AppTheme {
         space: 1,
       ),
 
-      // ── TextTheme ——
-      textTheme: const TextTheme(
-        displayLarge: HelpFlowTextStyles.headline1,
-        displayMedium: HelpFlowTextStyles.headline2,
-        displaySmall: HelpFlowTextStyles.headline3,
-        bodyLarge: HelpFlowTextStyles.body1,
-        bodyMedium: HelpFlowTextStyles.body2,
-        bodySmall: HelpFlowTextStyles.caption,
-        labelLarge: HelpFlowTextStyles.button,
-      ),
     );
   }
 }
