@@ -17,11 +17,20 @@ import '../../shared/widgets/empty_state_widget.dart';
 ///   admin → ticketListStreamProvider (전체 티켓, 관리 목적)
 ///   agent → myAssignedTicketListProvider (내 배정 티켓만)
 ///   user  → myTicketListStreamProvider (내 접수 티켓만)
-class TicketListScreen extends ConsumerWidget {
+/// 상단 필터 바(상태별)로 클라이언트 사이드 필터링 지원
+class TicketListScreen extends ConsumerStatefulWidget {
   const TicketListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TicketListScreen> createState() => _TicketListScreenState();
+}
+
+class _TicketListScreenState extends ConsumerState<TicketListScreen> {
+  /// 선택된 상태 필터 (null = 전체)
+  String? _statusFilter;
+
+  @override
+  Widget build(BuildContext context) {
     // 현재 사용자 역할 조회 (로딩 중이면 기본 user로 처리)
     final role = ref.watch(currentUserProvider).value?.role ?? UserRole.user;
 
@@ -48,21 +57,37 @@ class TicketListScreen extends ConsumerWidget {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
-          // ── user 전용: 상단 새 티켓 접수 버튼 ───────────────────────
-          if (role == UserRole.user)
-            _UserTicketHeader(),
+          // ── user 전용: 상단 새 티켓 접수 버튼 헤더 ──────────────────
+          if (role == UserRole.user) _UserTicketHeader(),
+
+          // ── 상태 필터 바 (모든 역할) ──────────────────────────────────
+          _StatusFilterBar(
+            selected: _statusFilter,
+            onSelect: (v) => setState(() => _statusFilter = v),
+          ),
 
           // ── 티켓 목록 ─────────────────────────────────────────────────
           Expanded(
             child: ticketsAsync.when(
               // ── 데이터 로드 완료 ───────────────────────────────────────
-              data: (tickets) {
+              data: (allTickets) {
+                // 선택된 필터로 클라이언트 사이드 필터링
+                final tickets = _statusFilter == null
+                    ? allTickets
+                    : allTickets
+                        .where((t) => t.status == _statusFilter)
+                        .toList();
+
                 if (tickets.isEmpty) {
                   return EmptyStateWidget(
                     icon: Icons.confirmation_number_outlined,
-                    message: emptyMessage,
-                    subtitle: emptySubtitle,
-                    action: role == UserRole.user
+                    message: _statusFilter != null
+                        ? '해당 조건의 티켓이 없습니다'
+                        : emptyMessage,
+                    subtitle: _statusFilter != null
+                        ? '다른 필터를 선택해보세요'
+                        : emptySubtitle,
+                    action: role == UserRole.user && _statusFilter == null
                         ? FilledButton.icon(
                             onPressed: () => context.go(AppRoutes.ticketNew),
                             icon: const Icon(Icons.add),
@@ -105,6 +130,86 @@ class TicketListScreen extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── 상태 필터 바 ──────────────────────────────────────────────────────────────
+
+/// 상태별 필터 칩 가로 스크롤 바
+/// null 선택 시 전체, 특정 상태 선택 시 해당 상태만 표시
+class _StatusFilterBar extends StatelessWidget {
+  final String? selected;
+  final ValueChanged<String?> onSelect;
+
+  const _StatusFilterBar({required this.selected, required this.onSelect});
+
+  static const _filters = [
+    (label: '전체', value: null),
+    (label: '신규', value: TicketStatus.newTicket),
+    (label: '처리 중', value: TicketStatus.inProgress),
+    (label: '해결 완료', value: TicketStatus.resolved),
+    (label: '종료', value: TicketStatus.closed),
+  ];
+
+  static const _filterColors = {
+    TicketStatus.newTicket: Color(0xFF1565C0),
+    TicketStatus.inProgress: Color(0xFFFB8C00),
+    TicketStatus.resolved: Color(0xFF43A047),
+    TicketStatus.closed: Color(0xFF757575),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      color: theme.colorScheme.surface,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSizes.paddingMd,
+        vertical: AppSizes.paddingSm,
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: _filters.map((f) {
+            final isSelected = selected == f.value;
+            final chipColor = f.value != null
+                ? _filterColors[f.value]!
+                : theme.colorScheme.primary;
+
+            return Padding(
+              padding: const EdgeInsets.only(right: AppSizes.paddingSm),
+              child: FilterChip(
+                label: Text(f.label),
+                selected: isSelected,
+                onSelected: (_) => onSelect(f.value),
+                selectedColor: chipColor.withValues(alpha: 0.15),
+                checkmarkColor: chipColor,
+                labelStyle: AppTextStyles.bodySm.copyWith(
+                  color: isSelected
+                      ? chipColor
+                      : theme.colorScheme.onSurfaceVariant,
+                  fontWeight:
+                      isSelected ? FontWeight.w700 : FontWeight.w400,
+                ),
+                side: BorderSide(
+                  color: isSelected
+                      ? chipColor
+                      : theme.colorScheme.outlineVariant,
+                  width: isSelected ? 1.5 : 1,
+                ),
+                backgroundColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                showCheckmark: false,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }

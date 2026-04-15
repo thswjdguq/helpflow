@@ -109,6 +109,7 @@ class _TicketFormScreenState extends ConsumerState<TicketFormScreen> {
         priority: _priority,
         category: _category,
         reporterId: currentUser.uid,
+        reporterName: currentUser.name,
         imageUrls: imageUrls,
         createdAt: now,
         updatedAt: now,
