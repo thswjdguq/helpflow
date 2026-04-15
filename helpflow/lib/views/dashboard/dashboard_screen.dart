@@ -4,21 +4,41 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_sizes.dart';
 import '../../core/constants/app_strings.dart';
+import '../../core/router/app_router.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../features/auth/auth_provider.dart';
+import '../../features/auth/user_model.dart';
 import '../../features/dashboard/dashboard_provider.dart';
 import '../../shared/models/ticket_model.dart';
 
-/// 대시보드 화면
+/// 대시보드 화면 (역할별 분기)
 ///
-/// Firestore 실시간 데이터 기반 통계 카드 4개 + 최근 티켓 목록 표시.
-/// ticketStatsProvider: 전체/신규/처리중/해결됨/긴급 카운트 실시간 집계.
-/// recentTicketsProvider: 최근 5개 티켓 실시간 표시.
+/// admin  → 전체 현황 통계 + 바 차트 + 최근 티켓
+/// agent  → 내 배정 업무 현황 + 긴급 티켓 강조 + 최근 배정 티켓
+/// user   → 내 티켓 현황 + 새 티켓 접수 CTA + 최근 내 티켓
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    /// 실시간 통계 구독
+    final role = ref.watch(currentUserProvider).value?.role ?? UserRole.user;
+
+    return switch (role) {
+      UserRole.admin => const _AdminDashboard(),
+      UserRole.agent => const _AgentDashboard(),
+      _ => const _UserDashboard(),
+    };
+  }
+}
+
+// ── 관리자 대시보드 ────────────────────────────────────────────────────────────
+
+/// admin 전용: 전체 티켓 현황 통계 + 바 차트 + 최근 티켓 목록
+class _AdminDashboard extends ConsumerWidget {
+  const _AdminDashboard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(ticketStatsProvider);
 
     return SingleChildScrollView(
@@ -28,23 +48,65 @@ class DashboardScreen extends ConsumerWidget {
         children: [
           // ── 페이지 제목 ──────────────────────────────────────────────
           Text(
-            AppStrings.dashboardTitle,
+            '관리자 대시보드',
             style: AppTextStyles.pageTitle.copyWith(
               color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
+          Text(
+            '전체 헬프데스크 현황을 한눈에 확인합니다',
+            style: AppTextStyles.bodySm.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
           const SizedBox(height: AppSizes.paddingLg),
 
-          // ── 통계 카드 (실데이터) ─────────────────────────────────────
+          // ── 통계 카드 ────────────────────────────────────────────────
           statsAsync.when(
-            data: (stats) => _StatCardGrid(stats: stats),
+            data: (stats) => _StatCardGrid(
+              cards: [
+                _StatCardData(
+                  label: AppStrings.dashboardTotalTickets,
+                  value: stats.total.toString(),
+                  icon: Icons.confirmation_number_outlined,
+                  color: const Color(0xFF1565C0),
+                ),
+                _StatCardData(
+                  label: '신규 접수',
+                  value: stats.newCount.toString(),
+                  icon: Icons.fiber_new_outlined,
+                  color: const Color(0xFF757575),
+                ),
+                _StatCardData(
+                  label: AppStrings.dashboardInProgressTickets,
+                  value: stats.inProgress.toString(),
+                  icon: Icons.sync_outlined,
+                  color: const Color(0xFFFB8C00),
+                ),
+                _StatCardData(
+                  label: '긴급 티켓',
+                  value: stats.critical.toString(),
+                  icon: Icons.warning_amber_outlined,
+                  color: const Color(0xFFB71C1C),
+                ),
+              ],
+            ),
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, _) => _StatCardGrid(stats: const TicketStats.empty()),
+            error: (_, _) => _StatCardGrid(
+              cards: [
+                _StatCardData(
+                  label: AppStrings.dashboardTotalTickets,
+                  value: '0',
+                  icon: Icons.confirmation_number_outlined,
+                  color: const Color(0xFF1565C0),
+                ),
+              ],
+            ),
           ),
 
           const SizedBox(height: AppSizes.paddingXl),
 
-          // ── 티켓 상태별 바 차트 (fl_chart) ──────────────────────────
+          // ── 티켓 상태별 바 차트 ──────────────────────────────────────
           Text(
             '티켓 현황 차트',
             style: AppTextStyles.sectionTitle.copyWith(
@@ -56,7 +118,7 @@ class DashboardScreen extends ConsumerWidget {
 
           const SizedBox(height: AppSizes.paddingXl),
 
-          // ── 최근 티켓 목록 (실데이터) ────────────────────────────────
+          // ── 최근 접수 티켓 ───────────────────────────────────────────
           Text(
             AppStrings.dashboardRecentTickets,
             style: AppTextStyles.sectionTitle.copyWith(
@@ -64,7 +126,286 @@ class DashboardScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: AppSizes.paddingMd),
-          const _RecentTicketList(),
+          const _RecentTicketList(useAgent: false, useUser: false),
+        ],
+      ),
+    );
+  }
+}
+
+// ── 담당자 대시보드 ───────────────────────────────────────────────────────────
+
+/// agent 전용: 내 배정 업무 현황 + 처리 대기 티켓 강조 + 최근 배정 티켓
+class _AgentDashboard extends ConsumerWidget {
+  const _AgentDashboard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statsAsync = ref.watch(myAgentStatsProvider);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppSizes.paddingLg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── 페이지 제목 ──────────────────────────────────────────────
+          Text(
+            '내 업무 현황',
+            style: AppTextStyles.pageTitle.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          Text(
+            '나에게 배정된 티켓을 관리합니다',
+            style: AppTextStyles.bodySm.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSizes.paddingLg),
+
+          // ── 내 배정 통계 카드 ────────────────────────────────────────
+          statsAsync.when(
+            data: (stats) => _StatCardGrid(
+              cards: [
+                _StatCardData(
+                  label: '전체 배정',
+                  value: stats.total.toString(),
+                  icon: Icons.assignment_outlined,
+                  color: const Color(0xFF1565C0),
+                ),
+                _StatCardData(
+                  label: '처리 중',
+                  value: stats.inProgress.toString(),
+                  icon: Icons.sync_outlined,
+                  color: const Color(0xFFFB8C00),
+                ),
+                _StatCardData(
+                  label: '해결 완료',
+                  value: stats.resolved.toString(),
+                  icon: Icons.check_circle_outline,
+                  color: const Color(0xFF43A047),
+                ),
+                _StatCardData(
+                  label: '긴급',
+                  value: stats.critical.toString(),
+                  icon: Icons.warning_amber_outlined,
+                  color: const Color(0xFFB71C1C),
+                ),
+              ],
+            ),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (_, _) => const SizedBox.shrink(),
+          ),
+
+          const SizedBox(height: AppSizes.paddingXl),
+
+          // ── 처리 필요 안내 배너 ──────────────────────────────────────
+          _AgentActionBanner(),
+
+          const SizedBox(height: AppSizes.paddingXl),
+
+          // ── 최근 배정 티켓 ───────────────────────────────────────────
+          Text(
+            '최근 배정된 티켓',
+            style: AppTextStyles.sectionTitle.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: AppSizes.paddingMd),
+          const _RecentTicketList(useAgent: true, useUser: false),
+        ],
+      ),
+    );
+  }
+}
+
+/// 담당자에게 처리해야 할 티켓이 있을 때 강조 배너
+class _AgentActionBanner extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statsAsync = ref.watch(myAgentStatsProvider);
+    final stats = statsAsync.value;
+    if (stats == null || stats.inProgress == 0) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSizes.paddingMd),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFB8C00).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+        border: Border.all(
+          color: const Color(0xFFFB8C00).withValues(alpha: 0.4),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.pending_actions, color: Color(0xFFFB8C00), size: 28),
+          const SizedBox(width: AppSizes.paddingMd),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '처리 대기 중인 티켓 ${stats.inProgress}건',
+                  style: AppTextStyles.cardTitle.copyWith(
+                    color: const Color(0xFFFB8C00),
+                  ),
+                ),
+                Text(
+                  '티켓 목록에서 처리 완료 버튼을 눌러 진행해주세요',
+                  style: AppTextStyles.bodySm.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () => context.go(AppRoutes.tickets),
+            child: const Text('바로가기'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── 직원 대시보드 ─────────────────────────────────────────────────────────────
+
+/// user 전용: 내 티켓 현황 요약 + 새 티켓 접수 CTA + 최근 내 티켓
+class _UserDashboard extends ConsumerWidget {
+  const _UserDashboard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statsAsync = ref.watch(myUserStatsProvider);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppSizes.paddingLg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── 페이지 제목 ──────────────────────────────────────────────
+          Text(
+            '내 티켓 현황',
+            style: AppTextStyles.pageTitle.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          Text(
+            '접수한 티켓의 처리 현황을 확인합니다',
+            style: AppTextStyles.bodySm.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSizes.paddingLg),
+
+          // ── 새 티켓 접수 CTA 배너 ────────────────────────────────────
+          _NewTicketCtaBanner(),
+
+          const SizedBox(height: AppSizes.paddingXl),
+
+          // ── 내 티켓 통계 카드 ────────────────────────────────────────
+          statsAsync.when(
+            data: (stats) => _StatCardGrid(
+              cards: [
+                _StatCardData(
+                  label: '전체 접수',
+                  value: stats.total.toString(),
+                  icon: Icons.confirmation_number_outlined,
+                  color: const Color(0xFF1565C0),
+                ),
+                _StatCardData(
+                  label: '처리 대기',
+                  value: stats.newCount.toString(),
+                  icon: Icons.hourglass_empty_outlined,
+                  color: const Color(0xFF757575),
+                ),
+                _StatCardData(
+                  label: '처리 중',
+                  value: stats.inProgress.toString(),
+                  icon: Icons.sync_outlined,
+                  color: const Color(0xFFFB8C00),
+                ),
+                _StatCardData(
+                  label: '해결 완료',
+                  value: stats.resolved.toString(),
+                  icon: Icons.check_circle_outline,
+                  color: const Color(0xFF43A047),
+                ),
+              ],
+            ),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (_, _) => const SizedBox.shrink(),
+          ),
+
+          const SizedBox(height: AppSizes.paddingXl),
+
+          // ── 최근 내 티켓 ─────────────────────────────────────────────
+          Text(
+            '최근 접수한 티켓',
+            style: AppTextStyles.sectionTitle.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: AppSizes.paddingMd),
+          const _RecentTicketList(useAgent: false, useUser: true),
+        ],
+      ),
+    );
+  }
+}
+
+/// 직원 전용: 새 티켓 접수 유도 CTA 배너
+class _NewTicketCtaBanner extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSizes.paddingLg),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primary,
+            theme.colorScheme.primary.withValues(alpha: 0.8),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'IT 문제가 발생했나요?',
+                  style: AppTextStyles.sectionTitle.copyWith(
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '지금 바로 접수하면 담당자가 빠르게 처리해 드립니다',
+                  style: AppTextStyles.bodySm.copyWith(
+                    color: Colors.white.withValues(alpha: 0.85),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSizes.paddingMd),
+          FilledButton(
+            onPressed: () => context.go(AppRoutes.ticketNew),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: theme.colorScheme.primary,
+            ),
+            child: const Text('티켓 접수'),
+          ),
         ],
       ),
     );
@@ -73,42 +414,14 @@ class DashboardScreen extends ConsumerWidget {
 
 // ── 통계 카드 그리드 ──────────────────────────────────────────────────────────
 
-/// 실시간 TicketStats로 통계 카드 4개를 Wrap 반응형 배치
+/// 카드 데이터 목록을 받아 Wrap 반응형으로 배치
 class _StatCardGrid extends StatelessWidget {
-  final TicketStats stats;
+  final List<_StatCardData> cards;
 
-  const _StatCardGrid({required this.stats});
+  const _StatCardGrid({required this.cards});
 
   @override
   Widget build(BuildContext context) {
-    // stats 값을 카드 데이터로 변환
-    final cards = [
-      _StatCardData(
-        label: AppStrings.dashboardTotalTickets,
-        value: stats.total.toString(),
-        icon: Icons.confirmation_number_outlined,
-        color: const Color(0xFF1565C0),
-      ),
-      _StatCardData(
-        label: AppStrings.dashboardPendingTickets,
-        value: stats.newCount.toString(),
-        icon: Icons.hourglass_empty_outlined,
-        color: const Color(0xFF757575),
-      ),
-      _StatCardData(
-        label: AppStrings.dashboardInProgressTickets,
-        value: stats.inProgress.toString(),
-        icon: Icons.sync_outlined,
-        color: const Color(0xFF1E88E5),
-      ),
-      _StatCardData(
-        label: AppStrings.dashboardResolvedTickets,
-        value: stats.resolved.toString(),
-        icon: Icons.check_circle_outline,
-        color: const Color(0xFF43A047),
-      ),
-    ];
-
     return Wrap(
       spacing: AppSizes.paddingMd,
       runSpacing: AppSizes.paddingMd,
@@ -191,7 +504,7 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-// ── 티켓 상태별 바 차트 ───────────────────────────────────────────────────────
+// ── 티켓 상태별 바 차트 (admin 전용) ─────────────────────────────────────────
 
 /// ticketStatsProvider를 구독해 상태별 티켓 수를 바 차트로 표시
 class _StatusBarChart extends ConsumerWidget {
@@ -342,24 +655,41 @@ class _BarChartContent extends StatelessWidget {
   }
 }
 
-// ── 최근 티켓 목록 (실데이터) ─────────────────────────────────────────────────
+// ── 최근 티켓 목록 ────────────────────────────────────────────────────────────
 
-/// recentTicketsProvider를 구독해 최근 5개 티켓을 실시간으로 표시
+/// 역할에 따라 다른 Provider를 구독해 최근 티켓 표시
+///
+/// useAgent: true → myAgentRecentTicketsProvider (담당자 배정 티켓)
+/// useUser:  true → myUserRecentTicketsProvider  (직원 접수 티켓)
+/// 둘 다 false   → recentTicketsProvider          (전체 티켓, admin)
 class _RecentTicketList extends ConsumerWidget {
-  const _RecentTicketList();
+  final bool useAgent;
+  final bool useUser;
+
+  const _RecentTicketList({
+    required this.useAgent,
+    required this.useUser,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ticketsAsync = ref.watch(recentTicketsProvider);
+    final ticketsAsync = useAgent
+        ? ref.watch(myAgentRecentTicketsProvider)
+        : useUser
+            ? ref.watch(myUserRecentTicketsProvider)
+            : ref.watch(recentTicketsProvider);
 
     return ticketsAsync.when(
       data: (tickets) {
         if (tickets.isEmpty) {
           return Center(
-            child: Text(
-              '아직 티켓이 없습니다',
-              style: AppTextStyles.bodyMd.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSizes.paddingXl),
+              child: Text(
+                useUser ? '아직 접수한 티켓이 없습니다' : '티켓이 없습니다',
+                style: AppTextStyles.bodyMd.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           );
@@ -477,10 +807,12 @@ class _MiniChip extends StatelessWidget {
 
 // ── [파일 요약] ───────────────────────────────────────────────────────────────
 // 파일명: dashboard_screen.dart
-// 역할: 대시보드 메인 화면. Firestore 실시간 통계 및 최근 티켓 표시.
-//       _StatCardGrid: ticketStatsProvider로 전체/신규/처리중/해결됨 카드.
-//       _StatusBarChart: fl_chart BarChart — 상태별(신규/처리중/해결됨/종료) 건수 시각화.
-//       _RecentTicketList: recentTicketsProvider로 최근 5개 티켓 목록.
-//       최근 티켓 타일 클릭 시 /tickets/:id 상세 화면으로 이동.
-// 연관 파일: dashboard_provider.dart, ticket_model.dart
+// 역할: 역할별 대시보드 화면. role에 따라 세 가지 레이아웃으로 분기.
+//       _AdminDashboard: 전체 통계 카드 + 바 차트 + 최근 전체 티켓.
+//       _AgentDashboard: 내 배정 통계 카드 + 처리 대기 배너 + 최근 배정 티켓.
+//       _UserDashboard:  내 접수 통계 카드 + 새 티켓 접수 CTA + 최근 내 티켓.
+//       _StatCardGrid: 통계 카드 Wrap 배치.
+//       _StatusBarChart: fl_chart BarChart (admin 전용).
+//       _RecentTicketList: 역할에 따라 Provider 선택해 최근 티켓 표시.
+// 연관 파일: dashboard_provider.dart, ticket_model.dart, auth_provider.dart
 // ─────────────────────────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../auth/auth_provider.dart';
 import '../tickets/ticket_provider.dart';
 import '../../shared/models/ticket_model.dart';
 
@@ -74,7 +75,7 @@ final ticketStatsProvider = StreamProvider<TicketStats>((ref) {
 
 // ── 최근 티켓 Provider ───────────────────────────────────────────────────────
 
-/// 최근 5개 티켓을 실시간으로 반환하는 StreamProvider
+/// 최근 5개 티켓을 실시간으로 반환하는 StreamProvider (admin 전용)
 ///
 /// ticketListStreamProvider는 이미 createdAt 내림차순 정렬이므로
 /// 앞에서 최대 5개만 슬라이싱합니다.
@@ -83,11 +84,99 @@ final recentTicketsProvider = StreamProvider<List<TicketModel>>((ref) {
   return service.getTickets().map((tickets) => tickets.take(5).toList());
 });
 
+// ── 담당자(agent) 전용 Provider ──────────────────────────────────────────────
+
+/// 현재 로그인한 담당자의 배정 티켓 통계를 실시간 집계하는 StreamProvider
+///
+/// agentId가 현재 UID와 일치하는 티켓만 집계합니다.
+final myAgentStatsProvider = StreamProvider<TicketStats>((ref) {
+  final uid = ref.watch(authStateProvider).value?.uid;
+  if (uid == null) return Stream.value(const TicketStats.empty());
+
+  final service = ref.read(ticketServiceProvider);
+  return service.getTicketsByAgent(uid).map((tickets) {
+    return TicketStats(
+      total: tickets.length,
+      newCount: tickets
+          .where((t) => t.status == TicketStatus.newTicket)
+          .length,
+      inProgress: tickets
+          .where((t) => t.status == TicketStatus.inProgress)
+          .length,
+      resolved: tickets
+          .where((t) => t.status == TicketStatus.resolved)
+          .length,
+      closed: tickets
+          .where((t) => t.status == TicketStatus.closed)
+          .length,
+      critical: tickets
+          .where((t) => t.priority == TicketPriority.critical)
+          .length,
+    );
+  });
+});
+
+/// 현재 로그인한 담당자의 배정 티켓 중 최근 5개를 반환하는 StreamProvider
+final myAgentRecentTicketsProvider = StreamProvider<List<TicketModel>>((ref) {
+  final uid = ref.watch(authStateProvider).value?.uid;
+  if (uid == null) return Stream.value([]);
+
+  final service = ref.read(ticketServiceProvider);
+  return service.getTicketsByAgent(uid)
+      .map((tickets) => tickets.take(5).toList());
+});
+
+// ── 직원(user) 전용 Provider ─────────────────────────────────────────────────
+
+/// 현재 로그인한 직원의 접수 티켓 통계를 실시간 집계하는 StreamProvider
+///
+/// reporterId가 현재 UID와 일치하는 티켓만 집계합니다.
+final myUserStatsProvider = StreamProvider<TicketStats>((ref) {
+  final uid = ref.watch(authStateProvider).value?.uid;
+  if (uid == null) return Stream.value(const TicketStats.empty());
+
+  final service = ref.read(ticketServiceProvider);
+  return service.getTicketsByReporter(uid).map((tickets) {
+    return TicketStats(
+      total: tickets.length,
+      newCount: tickets
+          .where((t) => t.status == TicketStatus.newTicket)
+          .length,
+      inProgress: tickets
+          .where((t) => t.status == TicketStatus.inProgress)
+          .length,
+      resolved: tickets
+          .where((t) => t.status == TicketStatus.resolved)
+          .length,
+      closed: tickets
+          .where((t) => t.status == TicketStatus.closed)
+          .length,
+      critical: tickets
+          .where((t) => t.priority == TicketPriority.critical)
+          .length,
+    );
+  });
+});
+
+/// 현재 로그인한 직원의 접수 티켓 중 최근 5개를 반환하는 StreamProvider
+final myUserRecentTicketsProvider = StreamProvider<List<TicketModel>>((ref) {
+  final uid = ref.watch(authStateProvider).value?.uid;
+  if (uid == null) return Stream.value([]);
+
+  final service = ref.read(ticketServiceProvider);
+  return service.getTicketsByReporter(uid)
+      .map((tickets) => tickets.take(5).toList());
+});
+
 // ── [파일 요약] ───────────────────────────────────────────────────────────────
 // 파일명: dashboard_provider.dart
 // 역할: 대시보드 실시간 통계 데이터 Provider 정의.
 //       TicketStats: 전체/신규/처리중/해결됨/종료/긴급 카운트 모델.
-//       ticketStatsProvider: ticketListStreamProvider에서 실시간 집계.
-//       recentTicketsProvider: 최근 5개 티켓 실시간 반환.
-// 연관 파일: ticket_provider.dart, dashboard_screen.dart
+//       ticketStatsProvider: 전체 티켓 집계 (admin).
+//       recentTicketsProvider: 최근 5개 티켓 (admin).
+//       myAgentStatsProvider: 담당자 배정 티켓 통계 (agent).
+//       myAgentRecentTicketsProvider: 담당자 배정 최근 5개 (agent).
+//       myUserStatsProvider: 직원 접수 티켓 통계 (user).
+//       myUserRecentTicketsProvider: 직원 접수 최근 5개 (user).
+// 연관 파일: ticket_provider.dart, ticket_service.dart, dashboard_screen.dart
 // ─────────────────────────────────────────────────────────────────────────────
