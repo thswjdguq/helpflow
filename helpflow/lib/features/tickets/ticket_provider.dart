@@ -29,7 +29,7 @@ final ticketListStreamProvider = StreamProvider<List<TicketModel>>((ref) {
 });
 
 /// 현재 로그인 사용자의 티켓 목록만 구독하는 StreamProvider
-/// reporterId가 현재 UID와 일치하는 티켓만 반환
+/// reporterId가 현재 UID와 일치하는 티켓만 반환 (user 역할 전용)
 final myTicketListStreamProvider = StreamProvider<List<TicketModel>>((ref) {
   final ticketService = ref.read(ticketServiceProvider);
   // 현재 로그인 사용자 UID 조회
@@ -42,6 +42,20 @@ final myTicketListStreamProvider = StreamProvider<List<TicketModel>>((ref) {
   }
 
   return ticketService.getTicketsByReporter(uid);
+});
+
+/// 현재 로그인 담당자(agent)에게 배정된 티켓 목록을 구독하는 StreamProvider
+/// agentId가 현재 UID와 일치하는 티켓만 반환 (agent 역할 전용)
+final myAssignedTicketListProvider = StreamProvider<List<TicketModel>>((ref) {
+  final ticketService = ref.read(ticketServiceProvider);
+  final authState = ref.watch(authStateProvider);
+  final uid = authState.value?.uid;
+
+  if (uid == null) {
+    return Stream.value([]);
+  }
+
+  return ticketService.getTicketsByAgent(uid);
 });
 
 // ── 티켓 목록 상태 관리 Notifier ──────────────────────────────────────────────
