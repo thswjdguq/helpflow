@@ -116,6 +116,9 @@ class TicketModel {
   /// 티켓을 접수한 사용자의 Firebase Auth UID
   final String reporterId;
 
+  /// 티켓을 접수한 사용자의 표시 이름 (빈 문자열이면 UID로 대체)
+  final String reporterName;
+
   /// 담당 상담원 UID (배정 전에는 null)
   final String? agentId;
 
@@ -136,6 +139,7 @@ class TicketModel {
     required this.priority,
     required this.category,
     required this.reporterId,
+    this.reporterName = '',
     this.agentId,
     required this.imageUrls,
     required this.createdAt,
@@ -156,6 +160,7 @@ class TicketModel {
       priority: data['priority'] as String? ?? TicketPriority.medium,
       category: data['category'] as String? ?? TicketCategory.etc,
       reporterId: data['reporterId'] as String? ?? '',
+      reporterName: data['reporterName'] as String? ?? '',
       agentId: data['agentId'] as String?,
       // List<dynamic> → List<String> 안전 변환
       imageUrls: List<String>.from(data['imageUrls'] as List<dynamic>? ?? []),
@@ -174,6 +179,7 @@ class TicketModel {
       'priority': priority,
       'category': category,
       'reporterId': reporterId,
+      'reporterName': reporterName,
       'agentId': agentId,
       'imageUrls': imageUrls,
       // DateTime → Firestore Timestamp 변환
@@ -191,6 +197,7 @@ class TicketModel {
     String? priority,
     String? category,
     String? reporterId,
+    String? reporterName,
     String? agentId,
     List<String>? imageUrls,
     DateTime? createdAt,
@@ -204,6 +211,7 @@ class TicketModel {
       priority: priority ?? this.priority,
       category: category ?? this.category,
       reporterId: reporterId ?? this.reporterId,
+      reporterName: reporterName ?? this.reporterName,
       agentId: agentId ?? this.agentId,
       imageUrls: imageUrls ?? this.imageUrls,
       createdAt: createdAt ?? this.createdAt,
