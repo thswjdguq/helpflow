@@ -2,6 +2,46 @@
 
 ---
 
+## 2026-04-16 (2주차 계속 — Firestore 보안 규칙)
+
+### 작업 내용
+**Firestore 보안 규칙 + 복합 인덱스 설정 및 배포**
+
+#### 변경 파일
+| 파일 | 변경 내용 |
+|------|---------|
+| `firestore.rules` | 역할 기반 보안 규칙 전체 작성 |
+| `firestore.indexes.json` | 복합 인덱스 4종 정의 |
+| `firebase.json` | firestore rules/indexes 섹션 추가 |
+
+#### 보안 규칙 상세
+- **users 컬렉션**: 본인만 읽기, 생성 시 role='user' 강제, 수정/삭제는 admin만
+- **tickets 컬렉션**:
+  - 읽기: admin/agent 전체, user는 본인 접수 티켓만
+  - 생성: user만, reporterId=본인uid, status='new' 강제
+  - 수정: admin 전체, agent는 본인 배정+in_progress→resolved만, user는 new 상태에서 내용만
+  - 삭제: admin만
+- **comments 서브컬렉션**: isInternal=true는 admin/agent만 작성, 삭제는 작성자 본인 또는 admin
+- **assets 컬렉션**: 로그인 사용자 읽기, 쓰기는 admin만
+
+#### 복합 인덱스
+- `tickets`: reporterId + createdAt(desc)
+- `tickets`: agentId + createdAt(desc)
+- `tickets`: status + createdAt(desc)
+- `comments`: ticketId + createdAt(asc)
+
+#### 배포
+- `firebase deploy --only firestore:rules` → 성공
+- `firebase deploy --only firestore:indexes` → 성공
+
+#### 커밋
+- `feat: Firestore 보안 규칙 + 복합 인덱스 설정 및 배포`
+
+### flutter analyze
+- 0 issues
+
+---
+
 ## 2026-04-16 (2주차 계속)
 
 ### 작업 내용

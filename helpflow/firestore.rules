@@ -1,0 +1,154 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────
+// HelpFlow — Firestore 보안 규칙
+//
+// 역할(role) 기반 접근 제어:
+//   admin  : 전체 읽기/쓰기
+//   agent  : 티켓 읽기 + 자신에게 배정된 티켓 상태 변경 + 댓글
+//   user   : 본인 티켓 접수/읽기 + 댓글
+//
+// 규칙 평가 순서: 위에서 아래로, 첫 번째 match가 적용
+// ─────────────────────────────────────────────────────────────
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── 헬퍼 함수 ────────────────────────────────────────────────────────────
+
+    /// 요청자가 로그인한 사용자인지 확인
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /// Firestore users 컬렉션에서 요청자의 role 필드를 조회
+    function getRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    /// 관리자(admin) 여부
+    function isAdmin() {
+      return isSignedIn() && getRole() == 'admin';
+    }
+
+    /// 현장 담당자(agent) 여부
+    function isAgent() {
+      return isSignedIn() && getRole() == 'agent';
+    }
+
+    /// 직원(user) 여부
+    function isUser() {
+      return isSignedIn() && getRole() == 'user';
+    }
+
+    /// 요청자가 admin 또는 agent인지 확인
+    function isAdminOrAgent() {
+      return isSignedIn() && (getRole() == 'admin' || getRole() == 'agent');
+    }
+
+    // ── users 컬렉션 ─────────────────────────────────────────────────────────
+    // - 로그인한 사용자: 본인 문서만 읽기 가능
+    // - admin: 전체 읽기/쓰기 (역할 변경 포함)
+    // - 회원가입 시 본인 문서 생성 허용
+
+    match /users/{userId} {
+      /// 읽기: 본인 또는 admin
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+
+      /// 생성: 본인 계정 최초 생성 (회원가입 시), role은 반드시 'user'
+      allow create: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role == 'user';
+
+      /// 수정: admin만 가능 (역할 변경 포함)
+      allow update: if isAdmin();
+
+      /// 삭제: admin만 가능
+      allow delete: if isAdmin();
+    }
+
+    // ── tickets 컬렉션 ───────────────────────────────────────────────────────
+
+    match /tickets/{ticketId} {
+      // ── 읽기 규칙 ────────────────────────────────────────────────────────
+      /// admin: 전체 티켓 읽기
+      /// agent: 전체 티켓 읽기 (목록 조회 필요)
+      /// user: 본인이 접수한 티켓만 읽기
+      allow read: if isSignedIn() && (
+        isAdmin()
+        || isAgent()
+        || (isUser() && resource.data.reporterId == request.auth.uid)
+      );
+
+      // ── 생성 규칙 ────────────────────────────────────────────────────────
+      /// user만 티켓 생성 가능
+      /// reporterId는 반드시 본인 uid, 초기 상태는 'new'
+      allow create: if isSignedIn()
+        && isUser()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.status == 'new';
+
+      // ── 수정 규칙 ────────────────────────────────────────────────────────
+      /// admin: 모든 필드 수정 가능 (담당자 배정, 상태 변경, 최종 종료 등)
+      /// agent: 자신에게 배정된 티켓의 status만 변경 가능 (resolved로만)
+      /// user: 본인 티켓의 제목/내용/카테고리/우선순위/이미지만 수정 (new 상태에서만)
+      allow update: if isSignedIn() && (
+        isAdmin()
+        || (isAgent()
+            && resource.data.agentId == request.auth.uid
+            && request.resource.data.status == 'resolved'
+            && resource.data.status == 'in_progress')
+        || (isUser()
+            && resource.data.reporterId == request.auth.uid
+            && resource.data.status == 'new'
+            && request.resource.data.status == 'new')
+      );
+
+      /// 삭제: admin만 가능
+      allow delete: if isAdmin();
+
+      // ── comments 서브컬렉션 ──────────────────────────────────────────────
+      // - 댓글 스트림은 로그인한 사용자 전체 (단, isInternal 필터는 앱에서 처리)
+      // - 내부 메모(isInternal=true) 쓰기는 admin/agent만 허용
+      // - 일반 댓글 쓰기는 티켓 접근 권한이 있는 사용자면 가능
+
+      match /comments/{commentId} {
+        /// 읽기: 해당 티켓을 읽을 수 있는 사용자 (앱에서 isInternal 필터링)
+        allow read: if isSignedIn() && (
+          isAdmin()
+          || isAgent()
+          || (isUser() && get(/databases/$(database)/documents/tickets/$(ticketId)).data.reporterId == request.auth.uid)
+        );
+
+        /// 생성: 로그인 + 본인 정보로만 작성
+        ///       isInternal=true는 admin/agent만 허용
+        allow create: if isSignedIn()
+          && request.resource.data.authorId == request.auth.uid
+          && (
+            // isInternal 댓글은 admin/agent만
+            (request.resource.data.isInternal == true && isAdminOrAgent())
+            // 일반 댓글은 해당 티켓 접근 권한 있는 사용자
+            || (request.resource.data.isInternal == false && (
+              isAdminOrAgent()
+              || (isUser() && get(/databases/$(database)/documents/tickets/$(ticketId)).data.reporterId == request.auth.uid)
+            ))
+          );
+
+        /// 수정: 불가 (댓글 수정 기능 없음)
+        allow update: if false;
+
+        /// 삭제: admin 또는 댓글 작성자 본인
+        allow delete: if isAdmin()
+          || (isSignedIn() && resource.data.authorId == request.auth.uid);
+      }
+    }
+
+    // ── assets 컬렉션 (10주차 구현 예정) ────────────────────────────────────
+    match /assets/{assetId} {
+      /// 읽기: 로그인한 모든 사용자
+      allow read: if isSignedIn();
+      /// 쓰기: admin만
+      allow write: if isAdmin();
+    }
+  }
+}
