@@ -29,6 +29,18 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
   /// 선택된 상태 필터 (null = 전체)
   String? _statusFilter;
 
+  /// 검색 키워드 (빈 문자열 = 전체)
+  String _searchQuery = '';
+
+  /// 검색 입력 컨트롤러
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     // 현재 사용자 역할 조회 (로딩 중이면 기본 user로 처리)
@@ -53,12 +65,20 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
       _ => AppStrings.emptyTicketsSubtitle,
     };
 
+    final hasActiveFilter = _statusFilter != null || _searchQuery.isNotEmpty;
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
           // ── user 전용: 상단 새 티켓 접수 버튼 헤더 ──────────────────
           if (role == UserRole.user) _UserTicketHeader(),
+
+          // ── 검색 바 (모든 역할) ───────────────────────────────────────
+          _SearchBar(
+            controller: _searchController,
+            onChanged: (q) => setState(() => _searchQuery = q),
+          ),
 
           // ── 상태 필터 바 (모든 역할) ──────────────────────────────────
           _StatusFilterBar(
@@ -71,23 +91,33 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
             child: ticketsAsync.when(
               // ── 데이터 로드 완료 ───────────────────────────────────────
               data: (allTickets) {
-                // 선택된 필터로 클라이언트 사이드 필터링
-                final tickets = _statusFilter == null
+                // 상태 필터 적용
+                var tickets = _statusFilter == null
                     ? allTickets
-                    : allTickets
-                        .where((t) => t.status == _statusFilter)
-                        .toList();
+                    : allTickets.where((t) => t.status == _statusFilter).toList();
+
+                // 검색어 필터 적용 (제목 + 설명 대소문자 무시)
+                if (_searchQuery.isNotEmpty) {
+                  final q = _searchQuery.toLowerCase();
+                  tickets = tickets.where((t) {
+                    return t.title.toLowerCase().contains(q) ||
+                        t.description.toLowerCase().contains(q) ||
+                        t.reporterName.toLowerCase().contains(q);
+                  }).toList();
+                }
 
                 if (tickets.isEmpty) {
                   return EmptyStateWidget(
-                    icon: Icons.confirmation_number_outlined,
-                    message: _statusFilter != null
-                        ? '해당 조건의 티켓이 없습니다'
+                    icon: hasActiveFilter
+                        ? Icons.search_off_outlined
+                        : Icons.confirmation_number_outlined,
+                    message: hasActiveFilter
+                        ? '검색 결과가 없습니다'
                         : emptyMessage,
-                    subtitle: _statusFilter != null
-                        ? '다른 필터를 선택해보세요'
+                    subtitle: hasActiveFilter
+                        ? '검색어나 필터를 변경해보세요'
                         : emptySubtitle,
-                    action: role == UserRole.user && _statusFilter == null
+                    action: role == UserRole.user && !hasActiveFilter
                         ? FilledButton.icon(
                             onPressed: () => context.go(AppRoutes.ticketNew),
                             icon: const Icon(Icons.add),
@@ -107,6 +137,7 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
                     return _TicketCard(
                       ticket: ticket,
                       showReporter: role == UserRole.admin,
+                      searchQuery: _searchQuery,
                       onTap: () => context.go('/tickets/${ticket.id}'),
                     );
                   },
@@ -130,6 +161,58 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── 검색 바 ──────────────────────────────────────────────────────────────────
+
+/// 키워드 검색 입력 필드 (제목·설명·접수자 대상)
+class _SearchBar extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  const _SearchBar({required this.controller, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      color: theme.colorScheme.surface,
+      padding: const EdgeInsets.fromLTRB(
+        AppSizes.paddingMd,
+        AppSizes.paddingSm,
+        AppSizes.paddingMd,
+        AppSizes.paddingXs,
+      ),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        decoration: InputDecoration(
+          hintText: '티켓 제목, 내용, 접수자로 검색',
+          prefixIcon: const Icon(Icons.search, size: 20),
+          suffixIcon: controller.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear, size: 18),
+                  onPressed: () {
+                    controller.clear();
+                    onChanged('');
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: theme.colorScheme.surfaceContainerHigh,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(24),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSizes.paddingMd,
+            vertical: AppSizes.paddingSm,
+          ),
+          isDense: true,
+        ),
       ),
     );
   }
@@ -265,22 +348,57 @@ class _UserTicketHeader extends StatelessWidget {
 
 /// 개별 티켓을 카드 형태로 표시
 /// 상태 배지, 우선순위 배지, 제목, 설명(최대 2줄), 카테고리, 날짜 포함
-/// showReporter: true이면 접수자 ID를 추가로 표시 (admin 전용)
+/// showReporter: true이면 접수자 이름 표시 (admin 전용)
+/// searchQuery: 비어있지 않으면 제목에서 일치 부분을 강조 표시
 class _TicketCard extends StatelessWidget {
-  /// 표시할 티켓 모델
   final TicketModel ticket;
-
-  /// 카드 탭 콜백 (상세 화면 이동)
   final VoidCallback onTap;
-
-  /// 접수자 정보 표시 여부 (admin: true, 그 외: false)
   final bool showReporter;
+  final String searchQuery;
 
   const _TicketCard({
     required this.ticket,
     required this.onTap,
     this.showReporter = false,
+    this.searchQuery = '',
   });
+
+  /// 검색어가 포함된 텍스트를 RichText로 강조 표시
+  Widget _highlightedText(
+    String text,
+    String query,
+    TextStyle baseStyle,
+    TextStyle highlightStyle, {
+    int? maxLines,
+  }) {
+    if (query.isEmpty) {
+      return Text(text, style: baseStyle, maxLines: maxLines,
+          overflow: maxLines != null ? TextOverflow.ellipsis : null);
+    }
+    final lower = text.toLowerCase();
+    final queryLower = query.toLowerCase();
+    final spans = <TextSpan>[];
+    int start = 0;
+    while (true) {
+      final idx = lower.indexOf(queryLower, start);
+      if (idx == -1) {
+        spans.add(TextSpan(text: text.substring(start), style: baseStyle));
+        break;
+      }
+      if (idx > start) {
+        spans.add(TextSpan(text: text.substring(start, idx), style: baseStyle));
+      }
+      spans.add(TextSpan(
+          text: text.substring(idx, idx + query.length),
+          style: highlightStyle));
+      start = idx + query.length;
+    }
+    return RichText(
+      text: TextSpan(children: spans),
+      maxLines: maxLines,
+      overflow: maxLines != null ? TextOverflow.ellipsis : TextOverflow.clip,
+    );
+  }
 
   /// DateTime → 'YY.MM.DD' 형식 변환
   String _formatDate(DateTime dt) {
@@ -320,26 +438,36 @@ class _TicketCard extends StatelessWidget {
               ),
               const SizedBox(height: AppSizes.paddingSm),
 
-              // ── 제목 ──────────────────────────────────────────────────
-              Text(
+              // ── 제목 (검색어 일치 시 하이라이트) ─────────────────────
+              _highlightedText(
                 ticket.title,
-                style: AppTextStyles.cardTitle.copyWith(
+                searchQuery,
+                AppTextStyles.cardTitle.copyWith(
                   color: theme.colorScheme.onSurface,
                 ),
+                AppTextStyles.cardTitle.copyWith(
+                  color: theme.colorScheme.primary,
+                  backgroundColor:
+                      theme.colorScheme.primary.withValues(alpha: 0.12),
+                ),
                 maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
 
-              // ── 설명 (있는 경우만 표시) ────────────────────────────────
+              // ── 설명 (있는 경우만, 검색어 하이라이트) ─────────────────
               if (ticket.description.isNotEmpty) ...[
                 const SizedBox(height: AppSizes.paddingXs),
-                Text(
+                _highlightedText(
                   ticket.description,
-                  style: AppTextStyles.bodyMd.copyWith(
+                  searchQuery,
+                  AppTextStyles.bodyMd.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
+                  AppTextStyles.bodyMd.copyWith(
+                    color: theme.colorScheme.primary,
+                    backgroundColor:
+                        theme.colorScheme.primary.withValues(alpha: 0.12),
+                  ),
                   maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
 
