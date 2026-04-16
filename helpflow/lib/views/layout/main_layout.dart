@@ -166,8 +166,9 @@ class _MobileLayout extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).matchedLocation;
-    final isAdmin =
-        ref.watch(currentUserProvider).value?.role == UserRole.admin;
+    final role = ref.watch(currentUserProvider).value?.role;
+    final isAdmin = role == UserRole.admin;
+    final isUser = role == UserRole.user;
 
     // 역할에 따라 탭 목적지 구성
     final routes = [
@@ -184,6 +185,11 @@ class _MobileLayout extends ConsumerWidget {
     );
     if (selectedIndex < 0) selectedIndex = 0;
 
+    // 대시보드 또는 티켓 목록에서만 FAB 표시 (티켓 상세·작성 화면 제외)
+    final showFab = isUser &&
+        (location == AppRoutes.dashboard ||
+            location == AppRoutes.tickets);
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
@@ -192,6 +198,14 @@ class _MobileLayout extends ConsumerWidget {
           Expanded(child: child),
         ],
       ),
+      // user 역할 전용 FAB: 새 티켓 접수 빠른 버튼
+      floatingActionButton: showFab
+          ? FloatingActionButton.extended(
+              onPressed: () => context.go(AppRoutes.ticketNew),
+              icon: const Icon(Icons.add),
+              label: const Text('티켓 접수'),
+            )
+          : null,
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: selectedIndex,
         onTap: (index) => context.go(routes[index]),

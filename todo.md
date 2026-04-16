@@ -27,7 +27,7 @@
 - [x] TicketProvider Riverpod 상태 관리
 
 ### 🔴 P0 — 3주차
-- [ ] Firestore 보안 규칙 설정
+- [x] Firestore 보안 규칙 설정
 - [x] 역할별 화면 분기 (user/agent/admin)
 - [x] 로그아웃 시 자동으로 로그인 화면 이동
 - [x] 전체 인증 흐름 안정화
@@ -45,9 +45,9 @@
 - [x] Firebase Storage 이미지 업로드 연동
 
 ### 🔴 P0 — Firestore 보안 규칙
-- [ ] 로그인한 유저만 읽기/쓰기 가능
-- [ ] 본인 티켓만 수정 가능
-- [ ] admin은 전체 접근 가능
+- [x] 로그인한 유저만 읽기/쓰기 가능
+- [x] 본인 티켓만 수정 가능
+- [x] admin은 전체 접근 가능
 
 ---
 
