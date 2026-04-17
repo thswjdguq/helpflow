@@ -2,6 +2,42 @@
 
 ---
 
+## 2026-04-17 (3주차)
+
+### 작업 내용
+**통계 리포트 화면 + 모바일 UI 최적화 + 반응형 레이아웃 점검**
+
+#### 변경/신규 파일
+| 파일 | 변경 내용 |
+|------|---------|
+| `reports_provider.dart` | 전체 티켓 통계 집계 Provider (상태/카테고리/우선순위/일별 추이) |
+| `reports_screen.dart` | admin 전용 통계 리포트 화면 (fl_chart 4종 차트) |
+| `app_router.dart` | `/reports` 경로 추가 |
+| `app_strings.dart` | `navReports`, `reportsTitle` 상수 추가 |
+| `sidebar_widget.dart` | admin 전용 통계 리포트 메뉴 추가 |
+| `main_layout.dart` | NavigationRail + BottomNavBar에 리포트 탭 추가 |
+| `top_bar_widget.dart` | `/reports` 경로 제목 매핑 추가 |
+| `ticket_list_screen.dart` | pull-to-refresh (RefreshIndicator) 추가 |
+
+#### 기능 상세
+- **통계 리포트 (admin 전용)**:
+  - 요약 카드 4개: 전체 티켓 / 해결률 / 긴급 티켓 / 미처리
+  - 상태별 막대 차트 (신규/처리중/해결완료/종료)
+  - 일별 접수 꺾은선 차트 (최근 14일, 도트 + 영역 그라데이션)
+  - 카테고리별 막대 차트 (하드웨어/소프트웨어/네트워크/기타)
+  - 우선순위별 막대 차트 (긴급/높음/보통/낮음)
+  - 반응형: 태블릿 이상 카테고리+우선순위 2열 배치
+- **pull-to-refresh**: 티켓 목록 아래로 당기면 Provider invalidate 후 재구독
+- **반응형 점검**: 리포트 요약 카드 LayoutBuilder로 4열/2열 자동 전환
+
+#### 커밋
+- `feat: 통계 리포트 화면 + pull-to-refresh + 반응형 레이아웃 개선`
+
+### flutter analyze
+- 0 issues
+
+---
+
 ## 2026-04-16 (2주차 계속 — Firestore 보안 규칙)
 
 ### 작업 내용

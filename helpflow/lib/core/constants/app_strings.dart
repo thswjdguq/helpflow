@@ -11,7 +11,11 @@ class AppStrings {
   static const String navDashboard = '대시보드';
   static const String navTickets = '티켓 관리';
   static const String navUsers = '사용자 관리';
+  static const String navReports = '통계 리포트';
   static const String navSettings = '설정';
+
+  // ── 리포트 화면 ───────────────────────────────────
+  static const String reportsTitle = '통계 리포트';
 
   // ── 대시보드 화면 ─────────────────────────────────
   static const String dashboardTitle = '대시보드';

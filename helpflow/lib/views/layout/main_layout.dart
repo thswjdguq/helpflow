@@ -91,11 +91,12 @@ class _TabletLayout extends ConsumerWidget {
     final isAdmin =
         ref.watch(currentUserProvider).value?.role == UserRole.admin;
 
-    // admin 여부에 따라 목적지 목록 구성
+    // admin 여부에 따라 목적지 목록 구성 (admin은 사용자 관리 + 통계 리포트 추가)
     final routes = [
       AppRoutes.dashboard,
       AppRoutes.tickets,
       if (isAdmin) AppRoutes.users,
+      if (isAdmin) AppRoutes.reports,
       AppRoutes.settings,
     ];
 
@@ -134,6 +135,12 @@ class _TabletLayout extends ConsumerWidget {
                   selectedIcon: Icon(Icons.group),
                   label: Text(AppStrings.navUsers),
                 ),
+              if (isAdmin)
+                const NavigationRailDestination(
+                  icon: Icon(Icons.bar_chart_outlined),
+                  selectedIcon: Icon(Icons.bar_chart),
+                  label: Text(AppStrings.navReports),
+                ),
               const NavigationRailDestination(
                 icon: Icon(Icons.settings_outlined),
                 selectedIcon: Icon(Icons.settings),
@@ -170,11 +177,12 @@ class _MobileLayout extends ConsumerWidget {
     final isAdmin = role == UserRole.admin;
     final isUser = role == UserRole.user;
 
-    // 역할에 따라 탭 목적지 구성
+    // 역할에 따라 탭 목적지 구성 (admin은 사용자 관리 + 통계 리포트 추가)
     final routes = [
       AppRoutes.dashboard,
       AppRoutes.tickets,
       if (isAdmin) AppRoutes.users,
+      if (isAdmin) AppRoutes.reports,
       AppRoutes.settings,
     ];
 
@@ -225,6 +233,12 @@ class _MobileLayout extends ConsumerWidget {
               icon: Icon(Icons.group_outlined),
               activeIcon: Icon(Icons.group),
               label: AppStrings.navUsers,
+            ),
+          if (isAdmin)
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.bar_chart_outlined),
+              activeIcon: Icon(Icons.bar_chart),
+              label: AppStrings.navReports,
             ),
           const BottomNavigationBarItem(
             icon: Icon(Icons.settings_outlined),
