@@ -64,6 +64,13 @@ class SidebarWidget extends ConsumerWidget {
     route: AppRoutes.users,
   );
 
+  static const _NavItem _reportsItem = _NavItem(
+    label: AppStrings.navReports,
+    icon: Icons.bar_chart_outlined,
+    activeIcon: Icons.bar_chart,
+    route: AppRoutes.reports,
+  );
+
   static const _NavItem _settingsItem = _NavItem(
     label: AppStrings.navSettings,
     icon: Icons.settings_outlined,
@@ -85,10 +92,11 @@ class SidebarWidget extends ConsumerWidget {
     final role = ref.watch(currentUserProvider).value?.role;
     final isAdmin = role == UserRole.admin;
 
-    // 역할에 따라 메뉴 구성
+    // 역할에 따라 메뉴 구성 (admin은 사용자 관리 + 통계 리포트 추가)
     final navItems = [
       ..._commonItems,
       if (isAdmin) _usersItem,
+      if (isAdmin) _reportsItem,
       _settingsItem,
     ];
 

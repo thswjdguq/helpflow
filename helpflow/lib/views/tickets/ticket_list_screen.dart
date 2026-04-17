@@ -127,20 +127,34 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
                   );
                 }
 
-                return ListView.separated(
-                  padding: const EdgeInsets.all(AppSizes.paddingLg),
-                  itemCount: tickets.length,
-                  separatorBuilder: (_, _) =>
-                      const SizedBox(height: AppSizes.paddingSm),
-                  itemBuilder: (context, index) {
-                    final ticket = tickets[index];
-                    return _TicketCard(
-                      ticket: ticket,
-                      showReporter: role == UserRole.admin,
-                      searchQuery: _searchQuery,
-                      onTap: () => context.go('/tickets/${ticket.id}'),
-                    );
+                // pull-to-refresh: 스트림 Provider를 invalidate해 재구독
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    switch (role) {
+                      case UserRole.admin:
+                        ref.invalidate(ticketListStreamProvider);
+                      case UserRole.agent:
+                        ref.invalidate(myAssignedTicketListProvider);
+                      default:
+                        ref.invalidate(myTicketListStreamProvider);
+                    }
                   },
+                  child: ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(AppSizes.paddingLg),
+                    itemCount: tickets.length,
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(height: AppSizes.paddingSm),
+                    itemBuilder: (context, index) {
+                      final ticket = tickets[index];
+                      return _TicketCard(
+                        ticket: ticket,
+                        showReporter: role == UserRole.admin,
+                        searchQuery: _searchQuery,
+                        onTap: () => context.go('/tickets/${ticket.id}'),
+                      );
+                    },
+                  ),
                 );
               },
               // ── 로딩 중 ─────────────────────────────────────────────

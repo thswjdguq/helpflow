@@ -26,6 +26,7 @@ class TopBarWidget extends ConsumerWidget {
       return AppStrings.ticketDetailTitle;
     }
     if (location.startsWith(AppRoutes.settings)) return AppStrings.settingsTitle;
+    if (location.startsWith(AppRoutes.reports)) return AppStrings.reportsTitle;
     return AppStrings.dashboardTitle;
   }
 
