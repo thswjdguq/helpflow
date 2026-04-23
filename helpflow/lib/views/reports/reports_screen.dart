@@ -5,6 +5,7 @@ import '../../core/constants/app_sizes.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../features/reports/reports_provider.dart';
 import '../../shared/models/ticket_model.dart';
+import '../../shared/widgets/error_view.dart';
 
 /// 통계 리포트 화면 (admin 전용)
 ///
@@ -25,9 +26,9 @@ class ReportsScreen extends ConsumerWidget {
       body: reportAsync.when(
         data: (data) => _ReportBody(data: data),
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Text('오류가 발생했습니다: $e',
-              style: AppTextStyles.bodyMd),
+        error: (e, _) => ErrorView(
+          message: e.toString().replaceFirst('Exception: ', ''),
+          onRetry: () => ref.invalidate(reportDataProvider),
         ),
       ),
     );

@@ -13,6 +13,7 @@ import '../../views/tickets/ticket_list_screen.dart';
 import '../../views/tickets/ticket_detail_screen.dart';
 import '../../views/tickets/ticket_form_screen.dart';
 import '../../views/admin/user_management_screen.dart';
+import '../../views/notifications/notifications_screen.dart';
 import '../../views/reports/reports_screen.dart';
 import '../../views/settings/settings_screen.dart';
 
@@ -37,6 +38,7 @@ class AppRoutes {
   static const String ticketNew = '/tickets/new';
   static const String users = '/users';
   static const String reports = '/reports';
+  static const String notifications = '/notifications';
   static const String settings = '/settings';
 }
 
@@ -48,6 +50,24 @@ class AppRoutes {
 class _GoRouterNotifier extends ChangeNotifier {
   /// 외부에서 GoRouter refresh를 트리거할 때 호출
   void notify() => notifyListeners();
+}
+
+// ── 페이지 전환 헬퍼 ────────────────────────────────────────────────────────────
+
+/// Fade 전환 효과 페이지 빌더 (200ms, easeInOut)
+CustomTransitionPage<void> _fadePage(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 200),
+    reverseTransitionDuration: const Duration(milliseconds: 150),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      return FadeTransition(
+        opacity: CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+        child: child,
+      );
+    },
+  );
 }
 
 // ── GoRouter Provider ───────────────────────────────────────────────────────
@@ -175,49 +195,46 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: AppRoutes.dashboard,
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: DashboardScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                _fadePage(state, const DashboardScreen()),
           ),
           GoRoute(
             path: AppRoutes.tickets,
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: TicketListScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                _fadePage(state, const TicketListScreen()),
           ),
           // /tickets/new는 /tickets/:id보다 먼저 등록해야 매칭 우선순위 확보
           GoRoute(
             path: AppRoutes.ticketNew,
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: TicketFormScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                _fadePage(state, const TicketFormScreen()),
           ),
           GoRoute(
             path: AppRoutes.ticketDetail,
             pageBuilder: (context, state) {
               final ticketId = state.pathParameters['id'] ?? '';
-              return NoTransitionPage(
-                child: TicketDetailScreen(ticketId: ticketId),
-              );
+              return _fadePage(state, TicketDetailScreen(ticketId: ticketId));
             },
           ),
           GoRoute(
             path: AppRoutes.users,
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: UserManagementScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                _fadePage(state, const UserManagementScreen()),
           ),
           GoRoute(
             path: AppRoutes.reports,
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: ReportsScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                _fadePage(state, const ReportsScreen()),
+          ),
+          GoRoute(
+            path: AppRoutes.notifications,
+            pageBuilder: (context, state) =>
+                _fadePage(state, const NotificationsScreen()),
           ),
           GoRoute(
             path: AppRoutes.settings,
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: SettingsScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                _fadePage(state, const SettingsScreen()),
           ),
         ],
       ),

@@ -1,6 +1,6 @@
 # HelpFlow — 개발 우선순위 & TODO
 
-## 현재 Phase: Phase 1 (2주차 진행 중)
+## 현재 Phase: Phase 4~6 (4주차 진행 중)
 
 ---
 
@@ -77,13 +77,16 @@
 
 ## Phase 5 — 부가 기능 (10주차, 택1)
 
-### 🟡 P1 — 아래 중 하나만 선택
-- [ ] **옵션 A: FCM 푸시 알림**
-  - 티켓 배정 시 agent에게 알림
-  - 티켓 해결 시 user에게 알림
-- [ ] **옵션 B: QR 스캔**
-  - 자산(asset) 등록 및 QR 생성
-  - QR 스캔 → 자산 즉시 확인
+### 🟡 P1 — 인앱 알림 (Firestore 실시간)
+- [ ] NotificationModel + NotificationService 구현
+- [ ] notificationProvider (미읽음 카운트 + 목록 스트림)
+- [ ] 알림 화면 (NotificationsScreen)
+- [ ] 상단 바 알림 벨 아이콘 + 뱃지
+- [ ] 티켓 배정/해결/댓글 시 알림 자동 생성
+
+### 🟢 P2 — 향후 (선택)
+- [ ] FCM 실제 푸시 (Cloud Functions 필요)
+- [ ] QR 스캔 (mobile_scanner 패키지 추가 필요)
 
 ---
 
@@ -91,11 +94,11 @@
 
 ### 🟡 P1
 - [ ] 토스 스타일 UI 완성도 끌어올리기
-- [ ] 애니메이션 / 화면 전환 효과
-- [ ] 빈 화면 처리 (EmptyStateWidget)
-- [ ] 에러 화면 처리
-- [ ] 오프라인 대응 (Hive 로컬 캐시)
+- [ ] 화면 전환 페이지 애니메이션 (Fade + Slide)
+- [ ] 에러 화면 처리 (공통 ErrorView 위젯)
+- [x] 빈 화면 처리 (EmptyStateWidget)
 - [x] 검색 / 필터 기능
+- [ ] 오프라인 대응 (Hive 로컬 캐시)
 
 ---
 
@@ -136,7 +139,8 @@
 ```
 main      ← 최종본. 주 1회 병합
   └── week-02  ← 현재 작업 브랜치
-  └── week-03  ← 다음 주 생성 예정
+  └── week-03  ← 완료
+  └── week-04  ← 현재 작업 브랜치
 ```
 
 ---

@@ -5,10 +5,12 @@ import '../../core/design_system.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../features/auth/auth_provider.dart';
 import '../../features/auth/user_model.dart';
+import '../../features/notifications/notification_provider.dart';
 import '../../features/tickets/comment_provider.dart';
 import '../../features/tickets/ticket_provider.dart';
 import '../../features/admin/user_provider.dart';
 import '../../shared/models/comment_model.dart';
+import '../../shared/models/notification_model.dart';
 import '../../shared/models/ticket_model.dart';
 
 /// 티켓 상세 화면
@@ -116,8 +118,30 @@ class _TicketDetailContentState extends ConsumerState<_TicketDetailContent> {
       );
       await ref.read(commentServiceProvider).addComment(comment);
       _commentController.clear();
-      // 내부 메모 토글은 전송 후 초기화
       if (_isInternal) setState(() => _isInternal = false);
+
+      // 내부 메모가 아닐 때만 상대방에게 알림 발송
+      if (!comment.isInternal) {
+        final ticket = widget.ticket;
+        // user가 댓글 → agent에게, agent/admin이 댓글 → user(reporter)에게 알림
+        final recipientId = user.role == UserRole.user
+            ? ticket.agentId
+            : ticket.reporterId;
+        if (recipientId != null && recipientId.isNotEmpty) {
+          await ref.read(notificationServiceProvider).createNotification(
+                NotificationModel(
+                  id: '',
+                  recipientId: recipientId,
+                  type: NotificationType.newComment,
+                  ticketId: ticket.id,
+                  ticketTitle: ticket.title,
+                  message:
+                      '${user.name.isNotEmpty ? user.name : user.email}님이 댓글을 남겼습니다.',
+                  createdAt: DateTime.now(),
+                ),
+              );
+        }
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -139,6 +163,32 @@ class _TicketDetailContentState extends ConsumerState<_TicketDetailContent> {
       await ref
           .read(ticketListProvider.notifier)
           .changeTicketStatus(widget.ticket.id, newStatus);
+
+      // resolved/closed 시 티켓 접수자(reporter)에게 알림
+      if (newStatus == TicketStatus.resolved ||
+          newStatus == TicketStatus.closed) {
+        final ticket = widget.ticket;
+        if (ticket.reporterId.isNotEmpty) {
+          final nType = newStatus == TicketStatus.resolved
+              ? NotificationType.ticketResolved
+              : NotificationType.ticketClosed;
+          final nMsg = newStatus == TicketStatus.resolved
+              ? '담당자가 티켓을 처리 완료했습니다.'
+              : '티켓이 최종 종료됐습니다.';
+          await ref.read(notificationServiceProvider).createNotification(
+                NotificationModel(
+                  id: '',
+                  recipientId: ticket.reporterId,
+                  type: nType,
+                  ticketId: ticket.id,
+                  ticketTitle: ticket.title,
+                  message: nMsg,
+                  createdAt: DateTime.now(),
+                ),
+              );
+        }
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -244,6 +294,20 @@ class _TicketDetailContentState extends ConsumerState<_TicketDetailContent> {
         updatedAt: DateTime.now(),
       );
       await ref.read(ticketListProvider.notifier).updateTicket(updated);
+
+      // 배정된 agent에게 알림 발송
+      await ref.read(notificationServiceProvider).createNotification(
+            NotificationModel(
+              id: '',
+              recipientId: result,
+              type: NotificationType.ticketAssigned,
+              ticketId: widget.ticket.id,
+              ticketTitle: widget.ticket.title,
+              message: '새 티켓이 담당자로 배정됐습니다.',
+              createdAt: DateTime.now(),
+            ),
+          );
+
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('담당자가 배정됐습니다')));
