@@ -7,6 +7,7 @@ import '../../core/router/app_router.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../features/auth/auth_provider.dart';
 import '../../features/auth/user_model.dart';
+import '../../features/notifications/notification_provider.dart';
 import '../../providers/theme_provider.dart';
 
 /// 상단 바 위젯
@@ -27,6 +28,7 @@ class TopBarWidget extends ConsumerWidget {
     }
     if (location.startsWith(AppRoutes.settings)) return AppStrings.settingsTitle;
     if (location.startsWith(AppRoutes.reports)) return AppStrings.reportsTitle;
+    if (location.startsWith(AppRoutes.notifications)) return AppStrings.notificationsTitle;
     return AppStrings.dashboardTitle;
   }
 
@@ -37,6 +39,8 @@ class TopBarWidget extends ConsumerWidget {
     final isDark = ref.watch(themeProvider);
     final currentUser = ref.watch(currentUserProvider).value;
     final role = currentUser?.role ?? UserRole.user;
+    final unreadCount =
+        ref.watch(unreadNotificationCountProvider).value ?? 0;
 
     return Container(
       height: AppSizes.topBarHeight,
@@ -76,6 +80,45 @@ class TopBarWidget extends ConsumerWidget {
             ),
             const SizedBox(width: AppSizes.paddingSm),
           ],
+
+          // ── 알림 벨 아이콘 (미읽음 뱃지) ──────────────
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_outlined),
+                onPressed: () => context.go(AppRoutes.notifications),
+                tooltip: '알림',
+              ),
+              if (unreadCount > 0)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: IgnorePointer(
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.error,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        unreadCount > 99 ? '99+' : '$unreadCount',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: theme.colorScheme.onError,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
 
           // ── 다크 모드 토글 버튼 ───────────────────────
           IconButton(

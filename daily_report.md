@@ -2,6 +2,49 @@
 
 ---
 
+## 2026-04-23 (4주차)
+
+### 작업 내용
+**인앱 알림 시스템 + 페이지 전환 애니메이션 + 에러 화면 + 보안 규칙 배포**
+
+#### 신규/변경 파일
+| 파일 | 변경 내용 |
+|------|---------|
+| `notification_model.dart` | 알림 데이터 모델 + NotificationType 상수 |
+| `notification_service.dart` | Firestore 알림 CRUD (생성/목록/읽음처리) |
+| `notification_provider.dart` | 알림 목록 + 미읽음 카운트 실시간 스트림 |
+| `notifications_screen.dart` | 알림 목록 화면 + 읽음/미읽음 스타일 분기 |
+| `ticket_detail_screen.dart` | 배정/해결/댓글 시 알림 자동 생성 |
+| `top_bar_widget.dart` | 알림 벨 아이콘 + 미읽음 뱃지 |
+| `app_router.dart` | /notifications 경로 + _fadePage 전환 애니메이션 |
+| `error_view.dart` | 공통 에러 표시 위젯 (아이콘 + 메시지 + 재시도) |
+| `ticket_list_screen.dart` | ErrorView 적용 + 재시도 버튼 |
+| `reports_screen.dart` | ErrorView 적용 + 재시도 버튼 |
+| `firestore.rules` | notifications 컬렉션 보안 규칙 추가 |
+| `firestore.indexes.json` | notifications 복합 인덱스 2종 추가 |
+| `todo.md` | Phase 5 항목 재정의 (FCM→인앱 알림), 4주차 브랜치 업데이트 |
+
+#### 기능 상세
+- **인앱 알림**:
+  - 티켓 배정 → 해당 agent 알림
+  - 티켓 resolved/closed → reporter 알림
+  - 댓글 작성(공개) → 상대방 알림
+  - 알림 화면: 최신순 목록, 타입별 아이콘/색상, 미읽음 파란 점 표시
+  - "모두 읽음" 일괄 처리 (WriteBatch)
+  - 탭 → 해당 티켓 상세 이동
+- **상단 바**: 알림 벨 아이콘 + 미읽음 수 빨간 뱃지 (99+까지 표시)
+- **페이지 전환**: NoTransitionPage → _fadePage (200ms fade) 전체 적용
+- **에러 화면**: 공통 ErrorView 위젯 (아이콘 + 메시지 + 재시도 버튼)
+- **Firestore 배포**: 알림 규칙 + 인덱스 2종 배포 완료
+
+#### 커밋
+- `feat: 인앱 알림 시스템 + 페이지 전환 애니메이션 + 에러 화면 개선`
+
+### flutter analyze
+- 0 issues
+
+---
+
 ## 2026-04-17 (3주차)
 
 ### 작업 내용

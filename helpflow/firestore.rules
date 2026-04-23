@@ -143,6 +143,29 @@ service cloud.firestore {
       }
     }
 
+    // ── notifications 컬렉션 ─────────────────────────────────────────────────
+    // - 본인에게 온 알림만 읽기 가능
+    // - 알림 생성은 로그인한 사용자면 가능 (서버 측 검증은 앱 로직으로 대체)
+    // - 읽음 처리(isRead 업데이트)는 수신자 본인만 가능
+    // - 삭제는 수신자 본인만 가능
+
+    match /notifications/{notificationId} {
+      /// 읽기: 수신자 본인만
+      allow read: if isSignedIn()
+        && resource.data.recipientId == request.auth.uid;
+
+      /// 생성: 로그인한 사용자 (앱 내부에서만 호출됨)
+      allow create: if isSignedIn();
+
+      /// 수정: 수신자 본인만 (isRead 필드 변경 전용)
+      allow update: if isSignedIn()
+        && resource.data.recipientId == request.auth.uid;
+
+      /// 삭제: 수신자 본인 또는 admin
+      allow delete: if isAdmin()
+        || (isSignedIn() && resource.data.recipientId == request.auth.uid);
+    }
+
     // ── assets 컬렉션 (10주차 구현 예정) ────────────────────────────────────
     match /assets/{assetId} {
       /// 읽기: 로그인한 모든 사용자

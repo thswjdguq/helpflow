@@ -10,6 +10,7 @@ import '../../features/auth/user_model.dart';
 import '../../features/tickets/ticket_provider.dart';
 import '../../shared/models/ticket_model.dart';
 import '../../shared/widgets/empty_state_widget.dart';
+import '../../shared/widgets/error_view.dart';
 
 /// 티켓 목록 화면
 ///
@@ -160,17 +161,18 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
               // ── 로딩 중 ─────────────────────────────────────────────
               loading: () => const Center(child: CircularProgressIndicator()),
               // ── 에러 ────────────────────────────────────────────────
-              error: (e, _) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSizes.paddingLg),
-                  child: Text(
-                    e.toString().replaceFirst('Exception: ', ''),
-                    style: AppTextStyles.bodyMd.copyWith(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
+              error: (e, _) => ErrorView(
+                message: e.toString().replaceFirst('Exception: ', ''),
+                onRetry: () {
+                  switch (role) {
+                    case UserRole.admin:
+                      ref.invalidate(ticketListStreamProvider);
+                    case UserRole.agent:
+                      ref.invalidate(myAssignedTicketListProvider);
+                    default:
+                      ref.invalidate(myTicketListStreamProvider);
+                  }
+                },
               ),
             ),
           ),
