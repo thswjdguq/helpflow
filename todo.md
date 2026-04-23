@@ -78,11 +78,11 @@
 ## Phase 5 — 부가 기능 (10주차, 택1)
 
 ### 🟡 P1 — 인앱 알림 (Firestore 실시간)
-- [ ] NotificationModel + NotificationService 구현
-- [ ] notificationProvider (미읽음 카운트 + 목록 스트림)
-- [ ] 알림 화면 (NotificationsScreen)
-- [ ] 상단 바 알림 벨 아이콘 + 뱃지
-- [ ] 티켓 배정/해결/댓글 시 알림 자동 생성
+- [x] NotificationModel + NotificationService 구현
+- [x] notificationProvider (미읽음 카운트 + 목록 스트림)
+- [x] 알림 화면 (NotificationsScreen)
+- [x] 상단 바 알림 벨 아이콘 + 뱃지
+- [x] 티켓 배정/해결/댓글 시 알림 자동 생성
 
 ### 🟢 P2 — 향후 (선택)
 - [ ] FCM 실제 푸시 (Cloud Functions 필요)
@@ -94,8 +94,8 @@
 
 ### 🟡 P1
 - [ ] 토스 스타일 UI 완성도 끌어올리기
-- [ ] 화면 전환 페이지 애니메이션 (Fade + Slide)
-- [ ] 에러 화면 처리 (공통 ErrorView 위젯)
+- [x] 화면 전환 페이지 애니메이션 (Fade + Slide)
+- [x] 에러 화면 처리 (공통 ErrorView 위젯)
 - [x] 빈 화면 처리 (EmptyStateWidget)
 - [x] 검색 / 필터 기능
 - [ ] 오프라인 대응 (Hive 로컬 캐시)
