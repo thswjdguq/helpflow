@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/auth/auth_provider.dart';
 import '../../shared/models/ticket_model.dart';
+import '../../shared/services/offline_cache_service.dart';
 import '../../shared/services/ticket_service.dart';
 import '../../shared/services/storage_service.dart';
 
@@ -23,15 +24,23 @@ final storageServiceProvider = Provider<StorageService>((ref) {
 
 /// 전체 티켓 목록을 실시간으로 구독하는 StreamProvider
 /// Firestore 변경 시 자동으로 UI 갱신됨 (createdAt 내림차순)
+/// 데이터 수신 시 오프라인 캐시에 자동 저장
 final ticketListStreamProvider = StreamProvider<List<TicketModel>>((ref) {
   final ticketService = ref.read(ticketServiceProvider);
-  return ticketService.getTickets();
+  final cache = ref.read(offlineCacheServiceProvider);
+  return ticketService.getTickets().map((tickets) {
+    // 실시간 데이터 수신 시 Hive 캐시 갱신 (비동기 쿽)
+    cache.saveTickets(tickets);
+    return tickets;
+  });
 });
 
 /// 현재 로그인 사용자의 티켓 목록만 구독하는 StreamProvider
 /// reporterId가 현재 UID와 일치하는 티켓만 반환 (user 역할 전용)
+/// 데이터 수신 시 오프라인 캐시에 자동 저장
 final myTicketListStreamProvider = StreamProvider<List<TicketModel>>((ref) {
   final ticketService = ref.read(ticketServiceProvider);
+  final cache = ref.read(offlineCacheServiceProvider);
   // 현재 로그인 사용자 UID 조회
   final authState = ref.watch(authStateProvider);
   final uid = authState.value?.uid;
@@ -41,7 +50,11 @@ final myTicketListStreamProvider = StreamProvider<List<TicketModel>>((ref) {
     return Stream.value([]);
   }
 
-  return ticketService.getTicketsByReporter(uid);
+  return ticketService.getTicketsByReporter(uid).map((tickets) {
+    // 실시간 데이터 수신 시 Hive 캐시 갱신
+    cache.saveMyTickets(tickets, uid);
+    return tickets;
+  });
 });
 
 /// 현재 로그인 담당자(agent)에게 배정된 티켓 목록을 구독하는 StreamProvider
@@ -183,8 +196,8 @@ final ticketListProvider =
 // 파일명: ticket_provider.dart
 // 역할: Riverpod 기반 티켓 상태 관리.
 //       ticketServiceProvider: TicketService 싱글턴 제공.
-//       ticketListStreamProvider: 전체 티켓 실시간 Stream (admin/agent용).
-//       myTicketListStreamProvider: 본인 티켓만 실시간 Stream (user용).
+//       ticketListStreamProvider: 전체 티켓 실시간 Stream + Hive 캐시 저장.
+//       myTicketListStreamProvider: 본인 티켓만 실시간 Stream + Hive 캐시 저장.
 //       TicketListNotifier: createTicket / updateTicket / deleteTicket /
 //         changeTicketStatus 제공. 에러 시 rethrow로 UI catch 블록 실행 가능.
 // ─────────────────────────────────────────────────────────────────────────────

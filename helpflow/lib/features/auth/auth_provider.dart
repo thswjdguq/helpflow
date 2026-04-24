@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_service.dart';
 import 'user_model.dart';
+import '../../shared/services/offline_cache_service.dart';
 
 // ── AuthService 프로바이더 ────────────────────────────────────────────────────
 
@@ -114,6 +115,8 @@ class CurrentUserNotifier extends AsyncNotifier<UserModel?> {
 
     try {
       await authService.signOut();
+      // 로그아웃 시 Hive 캐시 전체 삭제 (사용자 데이터 분리)
+      await ref.read(offlineCacheServiceProvider).clearAll();
       // 로그아웃 성공: null로 초기화
       state = const AsyncData(null);
     } catch (e, st) {
