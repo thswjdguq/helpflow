@@ -10,6 +10,7 @@ import '../../features/auth/auth_provider.dart';
 import '../../features/auth/user_model.dart';
 import '../../features/dashboard/dashboard_provider.dart';
 import '../../shared/models/ticket_model.dart';
+import '../../shared/widgets/skeleton_loader.dart';
 
 /// 대시보드 화면 (역할별 분기)
 ///
@@ -91,17 +92,8 @@ class _AdminDashboard extends ConsumerWidget {
                 ),
               ],
             ),
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, _) => _StatCardGrid(
-              cards: [
-                _StatCardData(
-                  label: AppStrings.dashboardTotalTickets,
-                  value: '0',
-                  icon: Icons.confirmation_number_outlined,
-                  color: const Color(0xFF1565C0),
-                ),
-              ],
-            ),
+            loading: () => const SkeletonStatGrid(count: 4),
+            error: (err, st) => const SkeletonStatGrid(count: 4),
           ),
 
           const SizedBox(height: AppSizes.paddingXl),
@@ -193,7 +185,7 @@ class _AgentDashboard extends ConsumerWidget {
                 ),
               ],
             ),
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const SkeletonStatGrid(count: 4),
             error: (_, _) => const SizedBox.shrink(),
           ),
 
@@ -335,7 +327,7 @@ class _UserDashboard extends ConsumerWidget {
                 ),
               ],
             ),
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const SkeletonStatGrid(count: 4),
             error: (_, _) => const SizedBox.shrink(),
           ),
 

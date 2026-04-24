@@ -11,6 +11,7 @@ import '../../features/tickets/ticket_provider.dart';
 import '../../shared/models/ticket_model.dart';
 import '../../shared/widgets/empty_state_widget.dart';
 import '../../shared/widgets/error_view.dart';
+import '../../shared/widgets/skeleton_loader.dart';
 
 /// 티켓 목록 화면
 ///
@@ -158,8 +159,8 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
                   ),
                 );
               },
-              // ── 로딩 중 ─────────────────────────────────────────────
-              loading: () => const Center(child: CircularProgressIndicator()),
+              // ── 로딩 중 ──────────────────────────────────────
+              loading: () => const SkeletonTicketList(count: 5),
               // ── 에러 ────────────────────────────────────────────────
               error: (e, _) => ErrorView(
                 message: e.toString().replaceFirst('Exception: ', ''),

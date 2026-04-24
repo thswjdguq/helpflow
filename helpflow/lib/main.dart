@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'app.dart';
 import 'firebase_options.dart';
+import 'shared/services/offline_cache_service.dart';
 
 /// 앱 진입점
 /// Hive 초기화 → Firebase 초기화 → ProviderScope → App 실행
@@ -13,6 +14,10 @@ Future<void> main() async {
 
   // Hive 로컬 DB 초기화
   await Hive.initFlutter();
+
+  // 오프라인 캐시 서비스 초기화 (Hive Box 열기)
+  final cacheService = OfflineCacheService();
+  await cacheService.init();
 
   // Firebase 초기화
   // firebase_options.dart가 플레이스홀더인 경우 예외를 잡고 계속 진행
@@ -28,9 +33,13 @@ Future<void> main() async {
   }
 
   // ProviderScope로 전체 앱을 감싸서 Riverpod 상태 관리 활성화
+  // offlineCacheServiceProvider를 override해 초기화된 인스턴스 주입
   runApp(
-    const ProviderScope(
-      child: App(),
+    ProviderScope(
+      overrides: [
+        offlineCacheServiceProvider.overrideWithValue(cacheService),
+      ],
+      child: const App(),
     ),
   );
 }
@@ -39,6 +48,8 @@ Future<void> main() async {
 // 파일명: main.dart
 // 역할: 앱 진입점.
 //       Hive.initFlutter()로 로컬 DB 초기화.
+//       OfflineCacheService.init()으로 Hive Box 열기.
 //       Firebase.initializeApp()으로 Firebase 초기화
 //         (플레이스홀더 상태에서 실패해도 앱은 계속 실행).
+//       ProviderScope overrides로 초기화된 OfflineCacheService 주입.
 //       ProviderScope로 Riverpod 활성화 후 App 위젯 실행.
